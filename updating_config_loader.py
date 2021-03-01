@@ -1,13 +1,24 @@
 """
-Class to read a JSON config file from URL and cache in a local path.
+Class to read a JSON config files from a URL and cache in a local path.
+
+Author: Tazard 2021
+Compatibility: Python3
 """
+
 import json
 import os
 import requests
 
 class UpdatingConfigLoader:
     def __init__(self, local_path, remote_url, auth=None):
-        """A single file which is cached locally and updated from URL"""
+        """
+        A single JSON string which retrieved from a URL and cached locally.
+        
+        If URL is inaccessible or returns invalid data, the local file will be used.
+        If the local file doesn't exist and URL gives valid response, file will be created.
+        If both local file and URL are invalid, then exception will be raised.
+        If local file cannot be created, then exception will be raised.
+        """
         self.local_path = local_path
         self.remote_url = remote_url
         self.auth = auth
@@ -31,9 +42,11 @@ class UpdatingConfigLoader:
             try:
                 self.contents = json.loads(file_str)
             except json.JSONDecodeError as e:
-                self.log("Bad JSON file. Exception: {}. File: {}".format(self.local_path, e))
+                self.log("Bad cache file. JSONDecodeError: {}. File: \n{}".format(e, self.local_path))
                 print(file_str)
                 self.contents = None
+            else:
+                self.log("Loaded cached file ok")
         else:
             self.log("No cached file '{}'".format(self.local_path))
 
@@ -57,6 +70,8 @@ class UpdatingConfigLoader:
             print(remote)
             remote = None
             return
+        else:
+            self.log("Loaded URL ok")
 
         # Check if local file needs updating (compare as strings for simplicity)
         if remote != self.contents:
@@ -65,7 +80,7 @@ class UpdatingConfigLoader:
             self.save_to_file()
 
     def save_to_file(self):
-        self.log("Writing to {}".format(self.local_path))
+        self.log("Writing to cache file '{}'".format(self.local_path))
         try:
             with open(self.local_path, 'w') as f:
                 f.write(self.pretty_dump_json())
@@ -79,7 +94,7 @@ class UpdatingConfigLoader:
 
     def check_valid(self):
         if self.contents is None:
-            s = "Fatal Error - Failed to load correctly: '{}', '{}'"
+            s = "Fatal Error - Both URL and local file failed to load correctly: '{}', '{}'"
             self.log(s.format(self.local_path, self.remote_url))
             raise Exception("Failed to load")
         
