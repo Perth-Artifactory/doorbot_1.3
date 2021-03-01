@@ -1,0 +1,30 @@
+{
+    "io": {
+        "digital_output": {
+            "channel1": {"pin": 19},
+            "channel2": {"pin": 20},
+            "channel3": {"pin": 21},
+            "channel4": {"pin": 22}
+        },
+        "digital_input": {
+            "channel1": {"pin": 23},
+            "channel2": {"pin": 24},
+            "channel3": {"pin": 25},
+            "channel4": {"pin": 26}
+        }
+    },
+    "functionality": {
+        "digital_output": {
+            "door_solenoid": "channel1",
+            "foyer_lights": "channel2",
+            "carpark_lights": "channel3",
+            "spare": "channel4"
+        },
+        "digital_input": {
+            "door_closed_switch": "channel1",
+            "green_button": "channel2",
+            "red_button": "channel3",
+            "doorbell": "channel4"
+        }
+    }
+}
