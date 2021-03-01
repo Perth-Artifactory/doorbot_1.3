@@ -1,0 +1,6 @@
+{
+    "serial": {
+        "address": "/dev/serial0",
+        "baud": 9600
+    }
+}
