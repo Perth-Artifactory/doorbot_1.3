@@ -39,31 +39,36 @@ class TagReaderInterface:
 
     def check(self):
         """Parses serial for new tag, returns tag string or else None"""
-        data = self.read_next()
+        while True:
+            data = self.read_next()
 
-        if time.monotonic() - self.last_read_time < self.tag_read_cooldown_s:
-            # Ignore serial data until at least cooldown time has elapsed
-            return
+            if data is None:
+                # Loop only while there is data from serial
+                return
 
-        if not self.reading_tag:
-            if self.matches(data, self.START_BYTE):
-                # We have found the start of a tag
-                self.reading_tag = True
+            if time.monotonic() - self.last_read_time < self.tag_read_cooldown_s:
+                # Ignore serial data until at least cooldown time has elapsed
+                return
+
+            if not self.reading_tag:
+                if self.matches(data, self.START_BYTE):
+                    # We have found the start of a tag
+                    self.reading_tag = True
+                else:
+                    # Ignore all other bytes while not in "reading_tag" mode
+                    pass
             else:
-                # Ignore all other bytes while not in "reading_tag" mode
-                pass
-        else:
-            # We are expecting tag data
-            if self.matches(data, self.END_BYTE):
-                # We have found end of tag, process what we have
-                self.process_tag()
-            else:
-                # Add the received data to the read buffer as bytes
-                self.read_buffer += data
-                
-                if len(self.read_buffer) > self.PAYLOAD_LENGTH:
-                    # We have exceeded the expected payload length without an END_BYTE
+                # We are expecting tag data
+                if self.matches(data, self.END_BYTE):
+                    # We have found end of tag, process what we have
                     self.process_tag()
+                else:
+                    # Add the received data to the read buffer as bytes
+                    self.read_buffer += data
+                    
+                    if len(self.read_buffer) > self.PAYLOAD_LENGTH:
+                        # We have exceeded the expected payload length without an END_BYTE
+                        self.process_tag()
 
     def read_next(self):
         """Reads the next character from serial"""
