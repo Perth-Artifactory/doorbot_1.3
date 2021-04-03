@@ -1,5 +1,8 @@
 """
 Tests for DoorbotHatInterface
+
+Author: Tazard, 2021
+Compatibility: Python3
 """
 
 import time

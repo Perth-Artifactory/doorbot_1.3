@@ -2,7 +2,7 @@
 Tests for TagReaderInterface
 
 Author: Tazard, 2021
-Compaitibility: Python3
+Compatibility: Python3
 """
 import time
 import json
