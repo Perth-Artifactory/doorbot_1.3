@@ -5,6 +5,8 @@ config/enclave_keys.json
 config/config_test.json
 sounds/custom
 .vscode
+.venv
+slack_tokens.txt
 
 # ____ Generic Python ignores _____
 # Byte-compiled / optimized / DLL files
