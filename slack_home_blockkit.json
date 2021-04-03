@@ -1,0 +1,207 @@
+{
+	"type": "home",
+	"blocks": [
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "*Under development!*"
+			}
+		},
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "Welcome to Doorbot app home. This page lets you manually control Doorbot."
+			}
+		},
+		{
+			"type": "header",
+			"text": {
+				"type": "plain_text",
+				"text": "Door Lock Control (Admin)",
+				"emoji": true
+			}
+		},
+		{
+			"type": "section",
+			"fields": [
+				{
+					"type": "mrkdwn",
+					"text": "*Lock State*: Locked"
+				}
+			]
+		},
+		{
+			"type": "actions",
+			"elements": [
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Unlock Door (30s)",
+						"emoji": true
+					},
+					"value": "30",
+					"action_id": "open-door-30s"
+				},
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Unlock Door (5 min)",
+						"emoji": true
+					},
+					"value": "300",
+					"action_id": "open-door-300s"
+				},
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Lock Door",
+						"emoji": true
+					},
+					"value": "300",
+					"action_id": "close-door"
+				}
+			]
+		},
+		{
+			"type": "header",
+			"text": {
+				"type": "plain_text",
+				"text": "Space Open Control",
+				"emoji": true
+			}
+		},
+		{
+			"type": "section",
+			"fields": [
+				{
+					"type": "mrkdwn",
+					"text": "*Space State*: Closed"
+				}
+			]
+		},
+		{
+			"type": "actions",
+			"elements": [
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Set Open",
+						"emoji": true
+					},
+					"value": "open",
+					"action_id": "set-space-open"
+				},
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Set Closed",
+						"emoji": true
+					},
+					"value": "closed",
+					"action_id": "set-space-closed"
+				}
+			]
+		},
+		{
+			"type": "header",
+			"text": {
+				"type": "plain_text",
+				"text": "Carpark Lighting Control",
+				"emoji": true
+			}
+		},
+		{
+			"type": "section",
+			"fields": [
+				{
+					"type": "mrkdwn",
+					"text": "*Carpark Lighting*: Off"
+				}
+			]
+		},
+		{
+			"type": "actions",
+			"elements": [
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Turn On for 10 min",
+						"emoji": true
+					},
+					"value": "on-10min",
+					"action_id": "set-carpark-lighting-on-10min"
+				},
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Turn On",
+						"emoji": true
+					},
+					"value": "on",
+					"action_id": "set-carpark-lighting-on"
+				},
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Turn Off",
+						"emoji": true
+					},
+					"value": "off",
+					"action_id": "set-carpark-lighting-off"
+				}
+			]
+		},
+		{
+			"type": "header",
+			"text": {
+				"type": "plain_text",
+				"text": "Foyer Lighting Control",
+				"emoji": true
+			}
+		},
+		{
+			"type": "section",
+			"fields": [
+				{
+					"type": "mrkdwn",
+					"text": "*Foyer Lighting*: Off"
+				}
+			]
+		},
+		{
+			"type": "actions",
+			"elements": [
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Turn On",
+						"emoji": true
+					},
+					"value": "on",
+					"action_id": "set-foyer-lighting-on"
+				},
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Turn Off",
+						"emoji": true
+					},
+					"value": "off",
+					"action_id": "set-foyer-lighting-off"
+				}
+			]
+		}
+	]
+}
