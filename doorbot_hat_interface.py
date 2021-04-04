@@ -9,15 +9,21 @@ import time
 import serial
 import RPi.GPIO as GPIO
 
-
+# Input switch debounce time
 DEBOUNCE_WAIT_S = 0.1
+# Boolean state of GPIO output to turn relay on
+RELAY_ON = True
+RELAY_OFF = not RELAY_ON
 
 
 class DebouncedInput:
-    def __init__(self, pin, wait_time_s=DEBOUNCE_WAIT_S):
-        """Debounces a digital input pin by ignoring transitions for certain time"""
+    def __init__(self, pin: int):
+        """Debounces a digital input pin by ignoring transitions for certain time.
+        Value = High: Open circuit (switch not pressed)
+                Low: Closed circuit (switch pressed)
+        """
         self.pin = pin
-        self.wait_time_s = wait_time_s
+        self.wait_time_s = DEBOUNCE_WAIT_S
         self.current_value = None
         self.bouncing = False
         self.last_bounce_time = None
@@ -65,113 +71,91 @@ class DebouncedInput:
         return v
 
 
-class Output:
-    def __init__(self, pin):
+class RelayOutput:
+    def __init__(self, pin: int):
         self.pin = pin
 
-    def set(self, state):
+    def set(self, relay_on: bool):
+        """Set new state for hat relay"""
+        # Flip the logic if RELAY_ON is false
+        if RELAY_ON:
+            state = relay_on
+        else:
+            state = not relay_on
         GPIO.output(self.pin, state)
 
 
 class DoorbotHatInterface:
-    def __init__(self, config,
-            on_door_closed_changed=None, on_green_button_pressed=None, 
-            on_red_button_pressed=None, on_doorbell_pressed=None):
+    def __init__(self, config:dict, on_input_change):
         """
         Interface class to Doorbot Hat 1.3 digital inputs and outputs
         
-        Provides functions for setting relays on/off (named by their function)
-        and will trigger callbacks when inputs are triggered
+        Provides functions for setting relays on/off
+        and will trigger callback when inputs change
         """
         self.log("Setup start")
-
         self.config = config
-
-        self.on_door_closed_changed = on_door_closed_changed
-        self.on_green_button_pressed = on_green_button_pressed
-        self.on_red_button_pressed = on_red_button_pressed
-        self.on_doorbell_pressed = on_doorbell_pressed
-
+        self.on_input_change = on_input_change
         self.setup_io()
-
-        self.door_closed_input = DebouncedInput(self.pin_locator("input", "door_closed_switch"))
-        self.green_button_input = DebouncedInput(self.pin_locator("input", "green_button"))
-        self.red_button_input = DebouncedInput(self.pin_locator("input", "red_button"))
-        self.doorbell_input = DebouncedInput(self.pin_locator("input", "doorbell"))
-
-        self.door_solenoid_output = Output(self.pin_locator("output", "door_solenoid"))
-        self.foyer_lights_output = Output(self.pin_locator("output", "foyer_lights"))
-        self.carpark_lights_output = Output(self.pin_locator("output", "carpark_lights"))
-        self.spare_output = Output(self.pin_locator("output", "spare"))
-
+        self.inputs = [
+            DebouncedInput(self.pin_locator("input", "channel1")),
+            DebouncedInput(self.pin_locator("input", "channel2")),
+            DebouncedInput(self.pin_locator("input", "channel3")),
+            DebouncedInput(self.pin_locator("input", "channel4"))
+        ]
+        self.outputs = [
+            RelayOutput(self.pin_locator("output", "channel1")),
+            RelayOutput(self.pin_locator("output", "channel2")),
+            RelayOutput(self.pin_locator("output", "channel3")),
+            RelayOutput(self.pin_locator("output", "channel4"))
+        ]
         self.log("Setup complete")
 
     def __del__(self):
         GPIO.cleanup()
 
-    def log(self, message):
+    def log(self, message: str):
         print("[DoorbotHatInterface] {}".format(message))
 
-    def pin_locator(self, direction, functionality):
-        """For a given direction (input|output), find the functionality specified (e.g. door solenoid)"""
-        ch = self.config["functionality"]["digital_" + direction][functionality]
-        return self.config["io"]["digital_" + direction][ch]["pin"]
+    def pin_locator(self, direction, channel):
+        """For a given direction (input|output), lookup the pin for a channel"""
+        return self.config["io"]["digital_" + direction + "_pins"][channel]
 
     def setup_io(self):
         """Set pin modes of inputs and outputs and init outputs to off"""
+        # Use BCM pin map
         GPIO.setmode(GPIO.BCM)
 
         # Outputs
-        outputs = self.config["io"]["digital_output"]
-        for name in outputs:
+        outputs = self.config["io"]["digital_output_pins"]
+        for ch in outputs:
             # Set pin direction
-            GPIO.setup(outputs[name]["pin"], GPIO.OUT)
-            # Initialise pin low (relay off)
-            GPIO.output(outputs[name]["pin"], False)
+            GPIO.setup(outputs[ch], GPIO.OUT)
+            # Initialise pin as relay off
+            GPIO.output(outputs[ch], RELAY_OFF)
 
         # Inputs
-        inputs = self.config["io"]["digital_input"]
-        for name in outputs:
+        inputs = self.config["io"]["digital_input_pins"]
+        for ch in outputs:
             # Set pin direction
-            GPIO.setup(inputs[name]["pin"], GPIO.IN)
+            GPIO.setup(inputs[ch], GPIO.IN)
 
-    def set_door_solenoid(self, unlocked):
-        self.log("Set Door Solenoid Unlocked = {}".format(unlocked))
-        self.door_solenoid_output.set(state=unlocked)
-
-    def set_foyer_lights(self, on):
-        self.log("Set Foyer Lights On = {}".format(on))
-        self.foyer_lights_output.set(state=on)
-
-    def set_carpark_lights(self, on):
-        self.log("Set Carpark Lights On = {}".format(on))
-        self.carpark_lights_output.set(state=on)
-
-    def set_spare(self, on):
-        self.log("Set Spare On = {}".format(on))
-        self.spare_output.set(state=on)
+    def set_output(self, channel_number: int, relay_on: bool):
+        """Set state of given relay on doorbot hat"""
+        if not (1 <= channel_number <= 4):
+            raise Exception("Invalid output channel number {}".format(channel_number))
+        state_text = {True: "On", False: "Off"}[relay_on]
+        self.log("Set Output Channel {} to Relay {}".format(channel_number, state_text))
+        output_index = channel_number - 1
+        self.outputs[output_index].set(relay_on=relay_on)
 
     def read_inputs(self):
-        # Check door closed switch
-        self.door_closed_input.update()
-        if self.door_closed_input.has_changed():
-            self.log("Door closed switch changed to {}".format(self.door_closed_input.value()))
-            self.on_door_closed_changed(self.door_closed_input.value())
-
-        # Check green button and trigger only if its now high (has been pressed)
-        self.green_button_input.update()
-        if self.green_button_input.has_changed() and self.green_button_input.value():
-            self.log("Green button pressed")
-            self.on_green_button_pressed()
-
-        # Check green button and trigger only if its now high (has been pressed)
-        self.red_button_input.update()
-        if self.red_button_input.has_changed() and self.red_button_input.value():
-            self.log("Red button pressed")
-            self.on_red_button_pressed()
-
-        # Check doorbell button and trigger only if its now high (has been pressed)
-        self.doorbell_input.update()
-        if self.doorbell_input.has_changed() and self.doorbell_input.value():
-            self.log("Doorbell pressed")
-            self.on_doorbell_pressed()
+        """Read doorbot hat inputs and fire callbacks on change"""
+        for index, di in enumerate(self.inputs):
+            di.update()
+            if di.has_changed():
+                # Closed circuit (pressed) is True here
+                value = di.value()
+                channel = index + 1
+                self.log("Input Channel {} Changed to {}".format(channel, value))
+                self.on_input_change(channel, value)

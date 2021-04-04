@@ -9,20 +9,11 @@ import time
 import json
 from doorbot_hat_interface import DoorbotHatInterface
 
-TEST_CONFIG = "config/doorbot_hat_definition.json"
+TEST_CONFIG = "config/main_config.json"
 
 
-def on_door_closed_changed(state):
-    print("on_door_closed_changed - ", state)
-
-def on_green_button_pressed():
-    print("on_green_button_pressed")
-
-def on_red_button_pressed():
-    print("on_red_button_pressed")
-
-def on_doorbell_pressed():
-    print("on_doorbell_pressed")
+def on_input_change(channel:int, state:bool):
+    print("on_input_change - channel: {}, state: {}".format(channel, state))
 
 def main():
     last_time = time.monotonic()
@@ -30,10 +21,9 @@ def main():
 
     with open(TEST_CONFIG, 'r') as f:
         config = json.load(f)
+    config = config["doorbot_hat"]
     
-    o = DoorbotHatInterface(config, 
-            on_door_closed_changed, on_green_button_pressed,
-            on_red_button_pressed, on_doorbell_pressed)
+    o = DoorbotHatInterface(config, on_input_change)
 
     while True:
         # Read inputs which will fire callbacks when switch closed
@@ -43,10 +33,10 @@ def main():
         # Cycle through setting each relay so they can be tested
         if time.monotonic() - last_time > 2:
             last_time = time.monotonic()
-            o.set_door_solenoid(unlocked=count > 2)
-            o.set_foyer_lights(on=count > 3)
-            o.set_carpark_lights(on=count > 4)
-            o.set_spare(on=count > 5)
+            o.set_output(1, count > 2)
+            o.set_output(2, count > 3)
+            o.set_output(3, count > 4)
+            o.set_output(4, count > 5)
             count += 1
             count %= 7
 
