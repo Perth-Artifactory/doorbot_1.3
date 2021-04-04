@@ -1,0 +1,49 @@
+{
+    "enclave": {
+        "config": {
+            "remote": "https://enclave.guthrie.artifactory.org.au/door/config.json",
+            "local": "config/enclave_config.json"
+        },
+        "keys": {
+            "remote": "https://enclave.guthrie.artifactory.org.au/door/keys.json",
+            "local": "config/enclave_keys.json"
+        },
+        "auth": "config/enclave_auth.json"
+    },
+    "tag_reader": {
+        "serial": {
+            "address": "/dev/serial0",
+            "baud": 9600
+        }
+    },
+    "doorbot_hat": {
+        "io": {
+            "digital_output_pins": {
+                "channel1": 19,
+                "channel2": 20,
+                "channel3": 21,
+                "channel4": 22
+            },
+            "digital_input_pins": {
+                "channel1": 23,
+                "channel2": 24,
+                "channel3": 25,
+                "channel4": 26
+            }
+        }
+    },
+    "channel_assignments": {
+        "digital_output": {
+            "door_solenoid": "channel1",
+            "foyer_lights": "channel2",
+            "carpark_lights": "channel3",
+            "beacon": "channel4"
+        },
+        "digital_input": {
+            "door_closed_switch": "channel1",
+            "green_button": "channel2",
+            "red_button": "channel3",
+            "disable_internal_lights": "channel4"
+        }
+    }
+}
