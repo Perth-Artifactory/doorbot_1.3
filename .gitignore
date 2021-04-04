@@ -1,5 +1,5 @@
 # ____ Doorbot Specific Ignores _____
-config/auth_config.json
+config/enclave_auth.json
 config/enclave_config.json
 config/enclave_keys.json
 config/config_test.json
