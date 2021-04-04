@@ -7,6 +7,7 @@ sounds/custom
 .vscode
 .venv
 slack_tokens.txt
+original_config
 
 # ____ Generic Python ignores _____
 # Byte-compiled / optimized / DLL files
