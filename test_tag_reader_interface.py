@@ -8,7 +8,7 @@ import time
 import json
 from tag_reader_interface import TagReaderInterface
 
-TEST_CONFIG = "config/tag_reader_config.json"
+TEST_CONFIG = "config/main_config.json"
 
 def received_tag(tag):
     print("received tag - '{:X}'".format(tag))
@@ -16,6 +16,7 @@ def received_tag(tag):
 def main():
     with open(TEST_CONFIG, 'r') as f:
         config = json.load(f)
+    config = config["tag_reader"]
     
     o = TagReaderInterface(config, on_tag_received_callback=received_tag)
 

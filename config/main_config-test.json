@@ -1,16 +1,16 @@
 {
     "enclave": {
         "config": {
-            "remote": "https://enclave.guthrie.artifactory.org.au/door/config.json",
-            "local": "config/enclave_config.json"
+            "remote": "https://gist.githubusercontent.com/tazard/ecdd907a01b1c35d46347f6c8557ee65/raw/b41bba2ed414701fbce5d235a62879479ea673bb/config_dummy.json",
+            "local": "config/enclave_config-test.json"
         },
         "keys": {
-            "remote": "https://enclave.guthrie.artifactory.org.au/door/keys.json",
-            "local": "config/enclave_keys.json"
+            "remote": "https://gist.githubusercontent.com/tazard/0eb10b1f97cb9fc2e500496efddef1eb/raw/e1044c85469c371a48c4117c01ba44af360e0b23/config_keys_dummy.json",
+            "local": "config/enclave_keys-test.json"
         },
         "auth": {
-            "enabled": true,
-            "path": "config/enclave_auth.json"
+            "enabled": false,
+            "path": ""
         }
     },
     "tag_reader": {

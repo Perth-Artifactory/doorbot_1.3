@@ -75,8 +75,11 @@ class UpdatingConfigLoader:
 
         # Check if local file needs updating (compare as strings for simplicity)
         if remote != self.contents:
+            if self.contents is not None:
+                self.log("No valid local data, will save remote")
+            else:
+                self.log("Remote is different to local file, update local file")
             self.contents = remote
-            self.log("Remote is different to local file, update local file")
             self.save_to_file()
 
     def save_to_file(self):

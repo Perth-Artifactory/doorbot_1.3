@@ -1,0 +1,30 @@
+{
+    "name": "DoorBot",
+    "default_time": 45,
+    "serial": {
+        "pointer": "/dev/ttyACM0",
+        "baudrate": 9600
+    },
+    "keys": "keys.json",
+    "slack": {
+        "channel": "xxxx",
+        "token": "yyyy"
+    },
+    "sounds": {
+        "granted": "/home/pi/accessControl/granted.mp3",
+        "denied": "/home/pi/accessControl/denied.mp3",
+        "windows_xp": "/home/pi/accessControl/sounds/windows_xp.mp3",
+        "awoo": "/home/pi/accessControl/sounds/awoo.mp3",
+        "banjo": "/home/pi/accessControl/sounds/banjo.mp3",
+        "zelda": "/home/pi/accessControl/sounds/zelda_item.mp3",
+        "careless": "/home/pi/accessControl/sounds/careless_whisper.mp3",
+        "alcohol": "/home/pi/accessControl/sounds/alcoholic.mp3",
+        "vegeta": "/home/pi/accessControl/sounds/vegscream.mp3",
+        "door stuck": "/home/pi/accessControl/sounds/doorstuck.mp3",
+        "shrek somebody": "/home/pi/accessControl/sounds/shreksomebody.mp3",
+        "owouwu": "/home/pi/accessControl/sounds/owouwu.mp3",
+        "gamecube slap": "/home/pi/accessControl/sounds/gamecubeslap.mp3",
+        "wheatley hacking": "/home/pi/accessControl/sounds/wheatleyhacking.mp3",
+        "short skirt": "/home/pi/accessControl/sounds/shortskirtlongjacket.mp3"
+    }
+}
