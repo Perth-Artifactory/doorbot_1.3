@@ -97,18 +97,12 @@ class DoorbotHatInterface:
         self.config = config
         self.on_input_change = on_input_change
         self.setup_io()
-        self.inputs = [
-            DebouncedInput(self.pin_locator("input", "channel1")),
-            DebouncedInput(self.pin_locator("input", "channel2")),
-            DebouncedInput(self.pin_locator("input", "channel3")),
-            DebouncedInput(self.pin_locator("input", "channel4"))
-        ]
-        self.outputs = [
-            RelayOutput(self.pin_locator("output", "channel1")),
-            RelayOutput(self.pin_locator("output", "channel2")),
-            RelayOutput(self.pin_locator("output", "channel3")),
-            RelayOutput(self.pin_locator("output", "channel4"))
-        ]
+        self.inputs = []
+        for field in config['io']['digital_input_pins']:
+            self.inputs.append(DebouncedInput(self.pin_locator("input", field)))
+        self.outputs = []
+        for field in config['io']['digital_output_pins']:
+            self.outputs.append(RelayOutput(self.pin_locator("output", field)))
         self.log("Setup complete")
 
     def __del__(self):
@@ -136,14 +130,14 @@ class DoorbotHatInterface:
 
         # Inputs
         inputs = self.config["io"]["digital_input_pins"]
-        for ch in outputs:
+        for ch in inputs:
             # Set pin direction
             GPIO.setup(inputs[ch], GPIO.IN)
 
     def set_output(self, channel_number: int, relay_on: bool):
         """Set state of given relay on doorbot hat"""
-        if not (1 <= channel_number <= 4):
-            raise Exception("Invalid output channel number {}".format(channel_number))
+        # if not (1 <= channel_number <= 4):
+        #     raise Exception("Invalid output channel number {}".format(channel_number))
         state_text = {True: "On", False: "Off"}[relay_on]
         self.log("Set Output Channel {} to Relay {}".format(channel_number, state_text))
         output_index = channel_number - 1

@@ -1,9 +1,17 @@
 #!/usr/bin/python3
-
+import json
+from enclave_config import EnclaveConfig
+from doorbot_hat_interface import DoorbotHatInterface
+from 
 
 class Doorbot:
-    def __init__(self):
+    def __init__(self, config_path):
         # Load config
+        with open(config_path) as f:
+            self.config = json.load(f)
+
+        # Init enclave config
+        
         # Init Doorbot Hat Interface
         # Init RFID reader
         # Init slack interface
