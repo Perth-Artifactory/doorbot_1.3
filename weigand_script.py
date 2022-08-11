@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from  pywiegand import WiegandReader
+import time
 
 users = []
 
@@ -23,16 +24,19 @@ def converter(weigand):
 
 while True:
     # input("Press enter to scan buffer: ")
-    input()
+    # input()
     scan = ""
     scan = reader.read()
 
     try:
         key = converter(int(scan))
         # print(f"key = {key}, 0x{key:X}")
-        print(f"000{key}")
+        print(f"{scan},{key:0>10},,,")
+        # print(f"{key}")
     except TypeError:
         pass
+
+    time.sleep(0.1)
 
     # print("data: {}".format(scan))
     # if scan:
