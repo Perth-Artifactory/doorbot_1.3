@@ -86,8 +86,53 @@ def test2():
         'convert2_dec',
     ]
     print(df[cols])
+    df[cols].to_csv(f'testing_keys_out.csv')
     pass
+
+def weigand_to_rfid(val: int):
+    """
+    Converts the decimal string from weigand RFID receiver to the
+    decimal string printed on keyfobs and also what USB RFID receiver
+    outputs.
+    """
+    # Remove top bit - doesn't seem to be used
+    bits = 31
+    top = val >> bits
+    top = top << bits
+    result = val - top
+
+    # Shift down by 7 - this aligns it correctly and cuts lower bits
+    result = result >> 7
+
+    # Extract bit 1 (2nd bit) which is used as bit 0 in final
+    result = result + ((val & 0b10) >> 1)
+
+    return result
+
+def old_door_pi_hex_str_to_rfid(hex_str: str):
+    """
+    Converts the hex string from old doorpi arduino to the
+    decimal string printed on keyfobs and also what USB RFID 
+    receiver outputs.
+    """
+    # Chop off the first 4 hex chars (2 bytes). These two dont
+    # appear in the hex conversion of the decimal value written
+    # on keyfobs and output from USB RFID reader.
+    hex_str = hex_str[4:]
+    return int(hex_str, 16)
+
+def test3():
+    df = pd.read_csv('testing_keys.csv')
+    df['outside_converted'] = df['outside'].apply(lambda x: old_door_pi_hex_str_to_rfid(x))
+    df['weigand_converted'] = df['weigand raw'].apply(lambda x: weigand_to_rfid(x))
+    df['pass'] = (df['inside'] == df['outside_converted']) & (df['inside'] == df['weigand_converted'])
+
+    print(df)
+    df.to_csv(f'testing_keys_test3.csv')
+    pass
+
 
 if __name__ == "__main__":
     # test1()
-    test2()
+    # test2()
+    test3()
