@@ -2,7 +2,7 @@
 from  pywiegand import WiegandReader
 
 
-# Weigand RFID Reader Pins (Using RPi GPIO/BcM mapping)
+# Weigand RFID Reader Pins (Using RPi GPIO/BCM mapping)
 PIN_D0 = 5
 PIN_D1 = 6
 
