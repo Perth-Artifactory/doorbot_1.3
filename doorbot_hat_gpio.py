@@ -1,13 +1,14 @@
 """
-Interface with doorbot 1.3 hat digital inputs and ouput
+Interface with Doorbot 1.3 hat digital inputs and ouput (GPIO).
+Control Relays and read from switches.
 
-Author: Tazard 2021
+Author: Tazard, 2022
 Compatibility: Python3
 """
 
 import time
-import serial
 import RPi.GPIO as GPIO
+
 
 # Input switch debounce time
 DEBOUNCE_WAIT_S = 0.1
@@ -15,12 +16,24 @@ DEBOUNCE_WAIT_S = 0.1
 RELAY_ON = True
 RELAY_OFF = not RELAY_ON
 
+# Labels for switches
+ID_SWITCH_1 = 'SW1'
+ID_SWITCH_2 = 'SW2'
+ID_SWITCH_3 = 'SW3'
+ID_SWITCH_4 = 'SW4'
+
+# Labels for relays
+ID_RELAY_1 = 'R1'
+ID_RELAY_2 = 'R2'
+ID_RELAY_3 = 'R3'
+ID_RELAY_4 = 'R4'
+
 
 class DebouncedInput:
     def __init__(self, pin: int):
-        """Debounces a digital input pin by ignoring transitions for certain time.
-        Value = High: Open circuit (switch not pressed)
-                Low: Closed circuit (switch pressed)
+        """
+        Debounces a digital input pin by ignoring transitions for certain time.
+        Inverts value so that HIGH is switch pressed and LOW is unpressed.
         """
         self.pin = pin
         self.wait_time_s = DEBOUNCE_WAIT_S
@@ -30,6 +43,8 @@ class DebouncedInput:
         self.value_changed = False
 
     def update(self):
+        # value = High: Open circuit (switch not pressed)
+        #         Low: Closed circuit (switch pressed)
         value = GPIO.input(self.pin)
 
         # Normally high inputs (open circuit is pullup)
@@ -85,24 +100,31 @@ class RelayOutput:
         GPIO.output(self.pin, state)
 
 
-class DoorbotHatInterface:
-    def __init__(self, config:dict, on_input_change):
+class DoorbotHatGpio:
+    def __init__(self):
         """
         Interface class to Doorbot Hat 1.3 digital inputs and outputs
         
         Provides functions for setting relays on/off
-        and will trigger callback when inputs change
+        and functions for checking if switches are pressed.
         """
         self.log("Setup start")
-        self.config = config
-        self.on_input_change = on_input_change
-        self.setup_io()
-        self.inputs = []
-        for field in config['io']['digital_input_pins']:
-            self.inputs.append(DebouncedInput(self.pin_locator("input", field)))
-        self.outputs = []
-        for field in config['io']['digital_output_pins']:
-            self.outputs.append(RelayOutput(self.pin_locator("output", field)))
+
+        # Use BCM pin map
+        GPIO.setmode(GPIO.BCM)
+
+        self.switches = {}
+        self.setup_switches(id=ID_SWITCH_1, pin=23)
+        self.setup_switches(id=ID_SWITCH_2, pin=24)
+        self.setup_switches(id=ID_SWITCH_3, pin=25)
+        self.setup_switches(id=ID_SWITCH_4, pin=26)
+
+        self.relays = {}
+        self.setup_relays(id=ID_RELAY_1, pin=19)
+        self.setup_relays(id=ID_RELAY_2, pin=20)
+        self.setup_relays(id=ID_RELAY_3, pin=21)
+        self.setup_relays(id=ID_RELAY_4, pin=22)
+
         self.log("Setup complete")
 
     def __del__(self):
@@ -111,45 +133,35 @@ class DoorbotHatInterface:
     def log(self, message: str):
         print("[DoorbotHatInterface] {}".format(message))
 
-    def pin_locator(self, direction, channel):
-        """For a given direction (input|output), lookup the pin for a channel"""
-        return self.config["io"]["digital_" + direction + "_pins"][channel]
+    def setup_switches(self, id, pin):
+        # Set pin direction
+        GPIO.setup(pin, GPIO.IN)
+        # Create the debouncer object
+        self.switches[id] = DebouncedInput(pin)
 
-    def setup_io(self):
-        """Set pin modes of inputs and outputs and init outputs to off"""
-        # Use BCM pin map
-        GPIO.setmode(GPIO.BCM)
+    def setup_relays(self, id, pin):
+        # Set pin direction
+        GPIO.setup(pin, GPIO.OUT)
+        # Initialise pin as relay off
+        GPIO.output(pin, RELAY_OFF)
+        # Create the debouncer object
+        self.switches[id] = RelayOutput(pin)
 
-        # Outputs
-        outputs = self.config["io"]["digital_output_pins"]
-        for ch in outputs:
-            # Set pin direction
-            GPIO.setup(outputs[ch], GPIO.OUT)
-            # Initialise pin as relay off
-            GPIO.output(outputs[ch], RELAY_OFF)
-
-        # Inputs
-        inputs = self.config["io"]["digital_input_pins"]
-        for ch in inputs:
-            # Set pin direction
-            GPIO.setup(inputs[ch], GPIO.IN)
-
-    def set_output(self, channel_number: int, relay_on: bool):
+    def set_relay(self, id: int, relay_on: bool):
         """Set state of given relay on doorbot hat"""
-        # if not (1 <= channel_number <= 4):
-        #     raise Exception("Invalid output channel number {}".format(channel_number))
+        if id not in self.relays:
+            raise Exception("Invalid relay '{}'".format(id))
         state_text = {True: "On", False: "Off"}[relay_on]
-        self.log("Set Output Channel {} to Relay {}".format(channel_number, state_text))
-        output_index = channel_number - 1
-        self.outputs[output_index].set(relay_on=relay_on)
+        self.log("Set Relay '{}' to '{}'".format(id, state_text))
+        self.relays[id].set(relay_on=relay_on)
 
-    def read_inputs(self):
-        """Read doorbot hat inputs and fire callbacks on change"""
-        for index, di in enumerate(self.inputs):
-            di.update()
-            if di.has_changed():
-                # Closed circuit (pressed) is True here
-                value = di.value()
-                channel = index + 1
-                self.log("Input Channel {} Changed to {}".format(channel, value))
-                self.on_input_change(channel, value)
+    def read_switches(self) -> dict:
+        """Read doorbot hat input switches and return current values"""
+        results = {}
+        for id in self.switches:
+            switch = self.switches[id]
+            switch.update()
+            results[id] = switch.value()
+            if switch.has_changed():
+                value = switch.value()
+                self.log("Switch '{}' Changed to '{}'".format(id, value))
