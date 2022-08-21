@@ -1,12 +1,20 @@
 #!/usr/bin/python3
 from  pywiegand import WiegandReader
-import time
+
+
+# Weigand RFID Reader Pins (Using RPi GPIO/BcM mapping)
+PIN_D0 = 5
+PIN_D1 = 6
 
 
 class WeigandRfid:
     def __init__(self) -> None:
+        """Connect to Weigand RFID reader and receive tags when calling 'read()'."""
         self.log("Initialising scanner...")
-        self.reader = WiegandReader(5,6)
+        self.reader = WiegandReader(PIN_D0, PIN_D1)
+
+    def log(self, message: str):
+        print("[WeigandRfid] {}".format(message))
 
     def read(self) -> int:
         """
@@ -21,9 +29,6 @@ class WeigandRfid:
             self.log("Read tag '{}' (raw data was: '{}')".format(tag_id, scan))
             return tag_id
         return 0
-
-    def log(self, message: str):
-        print("[WeigandRfid] {}".format(message))
 
     def weigand_to_rfid(val: int) -> int:
         """
