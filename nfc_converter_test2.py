@@ -1,5 +1,41 @@
 import pandas as pd
 
+def test1():
+    key = 846677508
+    print(f"key = {key}, 0x{key:X}")
+
+    wei = 1146944771
+    print(f"{wei} 0x{wei:X}")
+
+    for i in range(20):
+        # A = 30
+        # top = wei >> A
+        # top = top << A
+        # cut = wei - top
+        # cut = cut >> i
+        # print(f"{i} {cut} {top:X} 0x{cut:X}")
+
+        cut = wei >> i
+        print(f"{i} {cut} 0x{cut:X}")
+
+
+    # print()
+    # key = 6482599
+    # print(f"key = {key}, 0x{key:X}")
+
+    # wei = 829772546
+    # # for i in range(20):
+    # #     A = 30
+    # #     top = wei >> A
+    # #     top = top << A
+    # #     cut = wei - top
+    # #     cut = cut >> i
+    # #     print(f"{i} {cut} {top:X} 0x{cut:X}")
+
+    # cut = converter(wei)
+    # print(f"{cut} 0x{cut:X}")
+
+
 def cut_top(val, bits):
     top = val >> bits
     top = top << bits
@@ -7,7 +43,7 @@ def cut_top(val, bits):
     return cut
 
 def test2():
-    df = pd.read_csv('testing_keys.csv')
+    df = pd.read_csv('nfc_keys.csv')
     df['usb_hex'] = df['usb_dec'].apply(lambda x: f"{x:X}")
     df['weigand_hex'] = df['weigand_dec'].apply(lambda x: f"{x:X}")
     df['convert1'] = df['weigand_dec'].apply(lambda x: f"{x >> 7:X} {cut_top(x, 7) << 1:0>3b}")
@@ -85,6 +121,6 @@ def test3():
 
 
 if __name__ == "__main__":
-    # test1()
+    test1()
     # test2()
-    test3()
+    # test3()
