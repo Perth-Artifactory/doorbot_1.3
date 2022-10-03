@@ -8,6 +8,13 @@ logging.basicConfig(level=logging.DEBUG)
 
 app = AsyncApp(token=os.environ["SLACK_BOT_TOKEN"])
 
+DOORBOT_LOG_CHANNEL = "#doorbot-slack-test"
+
+async def post_slack_log(message):
+    await app.client.chat_postMessage(
+        channel=DOORBOT_LOG_CHANNEL,
+        text=message,
+    )
 
 
 def check_auth(b):
@@ -15,6 +22,9 @@ def check_auth(b):
     if b['user']['id'] == 'U7DD219GF':  # tazard
         return True
     return False
+
+def get_user_name(b):
+    return b['user']['name']
 
 def get_response_value(b):
     """Find the value action payload from dropdown"""
@@ -45,6 +55,7 @@ async def handle_send_message(ack, body, logger):
     if check_auth(body):
         value = get_response_value(body)
         logger.info(f"SEND MESSAGE = {value}")
+        await post_slack_log(f"Admin '{get_user_name(body)}' played message: {value}")
         messages = {"key_disabled":"noticeDisabled",
                     "volunteer_contact":"noticeContact",
                     "covid":"noticeCOVID",
@@ -59,6 +70,7 @@ async def handle_tts_message(ack, body, logger):
     logger.info("app.action 'ttsMessage':" + str(body))
     if check_auth(body):
         value = get_response_value(body)
+        await post_slack_log(f"Admin '{get_user_name(body)}' played TTS: {value}")
         logger.info(f"TTS MESSAGE = {value}")
 
 @app.action("unlock")
@@ -67,13 +79,13 @@ async def handle_unlock(ack, body, logger):
     logger.info("app.action 'unlock':" + str(body))
     if check_auth(body):
         value = get_response_value(body)
+        await post_slack_log(f"Admin '{get_user_name(body)}' manually opened door for {value} seconds")
         logger.info(f"DOOR UNLOCK = {value} seconds")
 
 async def run_offline_task():
     while True:
-        channel_id = "#doorbot-slack-test"
         await app.client.chat_postMessage(
-            channel=channel_id,
+            channel=DOORBOT_LOG_CHANNEL,
             text="Hi there!",
         )
         await asyncio.sleep(60)
