@@ -30,7 +30,7 @@ class WeigandRfid:
             return tag_id
         return 0
 
-    def weigand_to_rfid(val: int) -> int:
+    def weigand_to_rfid(self, val: int) -> int:
         """
         Converts the decimal string from weigand RFID receiver to the
         decimal string printed on keyfobs and also what USB RFID receiver
