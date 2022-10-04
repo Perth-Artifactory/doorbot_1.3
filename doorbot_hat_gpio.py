@@ -144,10 +144,10 @@ class DoorbotHatGpio:
         GPIO.setup(pin, GPIO.OUT)
         # Initialise pin as relay off
         GPIO.output(pin, RELAY_OFF)
-        # Create the debouncer object
-        self.switches[id] = RelayOutput(pin)
+        # Create the relay object
+        self.relays[id] = RelayOutput(pin)
 
-    def set_relay(self, id: int, relay_on: bool):
+    def set_relay(self, id, relay_on: bool):
         """Set state of given relay on doorbot hat"""
         if id not in self.relays:
             raise Exception("Invalid relay '{}'".format(id))
