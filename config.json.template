@@ -1,0 +1,7 @@
+{
+    "SLACK_APP_TOKEN": "",
+    "SLACK_BOT_TOKEN": "",
+    "mock_raspberry_pi": false,
+    "slack_channel": "#doorbot-slack-test",
+    "relay_channel": "R1"
+}

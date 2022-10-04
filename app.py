@@ -1,21 +1,42 @@
-from readline import get_begidx
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.app.async_app import AsyncApp
 import os
 import logging
+import json
+
 import slack_blocks
+import doorbot_hat_gpio
+import weigand_rfid
+
 logging.basicConfig(level=logging.DEBUG)
+general_logger = logging.getLogger()
 
-app = AsyncApp(token=os.environ["SLACK_BOT_TOKEN"])
+class Config:
+    """Config loader"""
+    def __init__(self) -> None:
+        with open("config.json", "r") as f:
+            config = json.load(f)
 
-DOORBOT_LOG_CHANNEL = "#doorbot-slack-test"
+        self.SLACK_APP_TOKEN = config["SLACK_APP_TOKEN"]
+        self.SLACK_BOT_TOKEN = config["SLACK_BOT_TOKEN"]
+        self.mock_raspberry_pi = config["mock_raspberry_pi"]
+        self.channel = config["slack_channel"]
+        self.relay_channel = config["relay_channel"]
 
-async def post_slack_log(message):
-    await app.client.chat_postMessage(
-        channel=DOORBOT_LOG_CHANNEL,
-        text=message,
-    )
+# Load the config
+config = Config()
 
+# Load the Doorbot hat GPIO
+hat_gpio = doorbot_hat_gpio.DoorbotHatGpio()
+
+# Flag to stop async unlock function running in parallel
+door_unlocked = False
+
+# Create RFID reader class
+rfid_reader = weigand_rfid.WeigandRfid()
+
+# Load the slack bolt app framework
+app = AsyncApp(token=config.SLACK_BOT_TOKEN)
 
 def check_auth(b):
     """Check whether a user/channel is authorised"""
@@ -79,23 +100,71 @@ async def handle_unlock(ack, body, logger):
     logger.info("app.action 'unlock':" + str(body))
     if check_auth(body):
         value = get_response_value(body)
-        await post_slack_log(f"Admin '{get_user_name(body)}' manually opened door for {value} seconds")
-        logger.info(f"DOOR UNLOCK = {value} seconds")
+        try:
+            time_s = float(value)
+        except ValueError:
+            logger.error("Invalid wait time: " + value)
+        else:
+            # Valid time
+            await post_slack_log(f"Admin '{get_user_name(body)}' manually opened door for {time_s:.1f} seconds")
+            logger.info(f"DOOR UNLOCK = {time_s:.1f} seconds")
+            await gpio_unlock(time_s)
 
-async def run_offline_task():
+async def post_slack_log(message):
+    await app.client.chat_postMessage(
+        channel=config.channel,
+        text=message,
+    )
+
+
+async def gpio_unlock(time_s: float):
+    # Use "door_unlocked" like a lock/mutex to ensure this doesn't run in parallel
+    global door_unlocked
+    if not door_unlocked:
+        door_unlocked = True
+
+        hat_gpio.set_relay(config.relay_channel, True)
+        general_logger.info(f"DoorbotHatGpio UNLOCKED DOOR")
+        await asyncio.sleep(time_s)
+        hat_gpio.set_relay(config.relay_channel, False)
+        general_logger.info(f"DoorbotHatGpio LOCK DOOR")
+
+        door_unlocked = False
+
+
+async def read_tags():
+    await app.client.chat_postMessage(
+        channel=config.channel,
+        text="Doorbot 1.3 Slack App Starting",
+    )
+
     while True:
-        await app.client.chat_postMessage(
-            channel=DOORBOT_LOG_CHANNEL,
-            text="Hi there!",
-        )
-        await asyncio.sleep(60)
+        # await app.client.chat_postMessage(
+        #     channel=config.channel,
+        #     text="Hi there!",
+        # )
+
+        tag = rfid_reader.read()
+        if tag != 0:
+            await app.client.chat_postMessage(
+                channel=config.channel,
+                text=f"Just read a tag: {tag}",
+            )
+            await app.client.chat_postMessage(
+                channel=config.channel,
+                text=f"Unlocking!",
+            )
+            await gpio_unlock(5.0)
+
+        await asyncio.sleep(0.1)
 
 
 async def main():
-    asyncio.ensure_future(run_offline_task())
-    handler = AsyncSocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
+    asyncio.ensure_future(read_tags())
+    handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
     await handler.start_async()
 
 if __name__ == "__main__":
+    general_logger.info("Starting up")
     import asyncio
     asyncio.run(main())
