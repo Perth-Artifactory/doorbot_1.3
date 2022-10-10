@@ -1,12 +1,20 @@
-from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
-from slack_bolt.app.async_app import AsyncApp
+"""
+Doorbot_1.3
+
+RFID and NFC based access control system for the Perth Artifactory.
+Interfaces with Slack and other services for administration and logging.
+"""
+
 import os
 import logging
 import json
+from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
+from slack_bolt.app.async_app import AsyncApp
 
 import slack_blocks
 import doorbot_hat_gpio
 import weigand_rfid
+import blinkstick_interface
 
 logging.basicConfig(level=logging.DEBUG)
 general_logger = logging.getLogger()
@@ -28,6 +36,9 @@ config = Config()
 
 # Load the Doorbot hat GPIO
 hat_gpio = doorbot_hat_gpio.DoorbotHatGpio()
+
+# Blinkstick - more LEDs!
+blink = blinkstick_interface.BlinkstickInterface()
 
 # Flag to stop async unlock function running in parallel
 door_unlocked = False
@@ -133,6 +144,7 @@ async def gpio_unlock(time_s: float):
 
 
 async def read_tags():
+    """Main worker coroutine to poll the RFID reader and unlock the door"""
     await app.client.chat_postMessage(
         channel=config.channel,
         text="Doorbot 1.3 Slack App Starting",
@@ -154,13 +166,23 @@ async def read_tags():
                 channel=config.channel,
                 text=f"Unlocking!",
             )
+            await app.client.chat_postMessage(
+                channel=config.channel,
+                text=f"Fallback text ... user opened door",
+                blocks=slack_blocks.door_access(name='Blake', tag=tag, status=':white_check_mark: Door unlocked', level=1)
+            )
             await gpio_unlock(5.0)
 
         await asyncio.sleep(0.1)
 
+async def update_keys():
+    """Worker coroutine to load keys from the API"""
+    while True:
+        await asyncio.sleep(60)
 
 async def main():
     asyncio.ensure_future(read_tags())
+    asyncio.ensure_future(update_keys())
     handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
     await handler.start_async()
 

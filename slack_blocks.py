@@ -101,3 +101,42 @@ home_view = {
         }
     ]
 }
+
+# Message posted when door access is being reported
+def door_access(name, tag, status, level):
+    return [
+        {
+            "type": "section",
+            "text": {
+                    "type": "plain_text",
+                    "text": "Someone interacted with the door",
+                    "emoji": True
+            }
+        },
+        {
+            "type": "section",
+            "fields": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Name:*\n{name}"
+                    },
+                {
+                        "type": "mrkdwn",
+                        "text": f"*RFID:*\n{tag}"
+                    }
+            ]
+        },
+        {
+            "type": "section",
+            "fields": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Status:*\n{status}"
+                    },
+                {
+                        "type": "mrkdwn",
+                        "text": f"*Level:*\n{level}"
+                    }
+            ]
+        }
+    ]
