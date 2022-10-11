@@ -3,5 +3,9 @@
     "SLACK_BOT_TOKEN": "",
     "mock_raspberry_pi": false,
     "slack_channel": "#doorbot-slack-test",
-    "relay_channel": "R1"
+    "relay_channel": "R1",
+    "keys": {
+        "url": "https://ip/api/v1/keys/door?token=xxxx",
+        "cache_file": "keys_cache.json"
+    }
 }

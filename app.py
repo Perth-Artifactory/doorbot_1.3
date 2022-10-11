@@ -15,6 +15,7 @@ import slack_blocks
 import doorbot_hat_gpio
 import weigand_rfid
 import blinkstick_interface
+import updating_config_loader
 
 logging.basicConfig(level=logging.DEBUG)
 general_logger = logging.getLogger()
@@ -30,6 +31,8 @@ class Config:
         self.mock_raspberry_pi = config["mock_raspberry_pi"]
         self.channel = config["slack_channel"]
         self.relay_channel = config["relay_channel"]
+        self.keys_url = config["keys"]["url"]
+        self.keys_cache_file = config["keys"]["cache_file"]
 
 # Load the config
 config = Config()
@@ -45,6 +48,13 @@ door_unlocked = False
 
 # Create RFID reader class
 rfid_reader = weigand_rfid.WeigandRfid()
+
+# Object to manage retrieving and caching keys.
+# Construction does the first update.
+key_store = updating_config_loader.UpdatingConfigLoader(
+    local_path=config.keys_cache_file,
+    remote_url=config.keys_url,
+)
 
 # Load the slack bolt app framework
 app = AsyncApp(token=config.SLACK_BOT_TOKEN)
@@ -176,9 +186,10 @@ async def read_tags():
         await asyncio.sleep(0.1)
 
 async def update_keys():
-    """Worker coroutine to load keys from the API"""
+    """Worker coroutine to refresh keys from the API"""
     while True:
         await asyncio.sleep(60)
+        key_store.update_from_url()
 
 async def main():
     asyncio.ensure_future(read_tags())
