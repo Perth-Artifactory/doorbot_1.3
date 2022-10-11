@@ -7,5 +7,6 @@
     "keys": {
         "url": "https://ip/api/v1/keys/door?token=xxxx",
         "cache_file": "keys_cache.json"
-    }
+    },
+    "level": 1
 }

@@ -33,6 +33,7 @@ class Config:
         self.relay_channel = config["relay_channel"]
         self.keys_url = config["keys"]["url"]
         self.keys_cache_file = config["keys"]["cache_file"]
+        self.level = config["level"]
 
 # Load the config
 config = Config()
@@ -161,27 +162,26 @@ async def read_tags():
     )
 
     while True:
-        # await app.client.chat_postMessage(
-        #     channel=config.channel,
-        #     text="Hi there!",
-        # )
-
         tag = rfid_reader.read()
         if tag != 0:
-            await app.client.chat_postMessage(
-                channel=config.channel,
-                text=f"Just read a tag: {tag}",
-            )
-            await app.client.chat_postMessage(
-                channel=config.channel,
-                text=f"Unlocking!",
-            )
-            await app.client.chat_postMessage(
-                channel=config.channel,
-                text=f"Fallback text ... user opened door",
-                blocks=slack_blocks.door_access(name='Blake', tag=tag, status=':white_check_mark: Door unlocked', level=1)
-            )
-            await gpio_unlock(5.0)
+            if tag in key_store.contents:
+                key = key_store.contents[tag]
+                name = key['name']
+                level = key['level']
+                await app.client.chat_postMessage(
+                    channel=config.channel,
+                    text=f"Unlocking door for {name}",
+                    blocks=slack_blocks.door_access(name=name, tag=tag, status=':white_check_mark: Door unlocked', level=level)
+                )
+                # TODO: Play access granted
+                await gpio_unlock(5.0)
+            else:
+                await app.client.chat_postMessage(
+                    channel=config.channel,
+                    text=f"Denied access to tag {tag}",
+                    blocks=slack_blocks.door_access(name="Unknown", tag=tag, status=':x: Access denied', level="Unknown")
+                )
+                # TODO: Play access denied
 
         await asyncio.sleep(0.1)
 
