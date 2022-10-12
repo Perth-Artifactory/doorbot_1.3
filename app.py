@@ -164,7 +164,8 @@ async def read_tags():
     while True:
         tag = rfid_reader.read()
         if tag != 0:
-            tag = str(tag)
+            # Pad with zeros to 10 digits like API expects
+            tag = f"{tag:0>10}"
             if tag in key_store.contents:
                 key = key_store.contents[tag]
                 name = key['name']
