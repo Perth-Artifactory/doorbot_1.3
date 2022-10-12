@@ -168,7 +168,7 @@ async def read_tags():
             if tag in key_store.contents:
                 key = key_store.contents[tag]
                 name = key['name']
-                level = key['level']
+                level = key['door']
                 await app.client.chat_postMessage(
                     channel=config.channel,
                     text=f"Unlocking door for {name}",
