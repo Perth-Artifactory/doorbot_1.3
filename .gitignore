@@ -10,6 +10,7 @@ slack_tokens.txt
 original_config
 *.csv
 config.json
+keys_cache.json
 
 # ____ Generic Python ignores _____
 # Byte-compiled / optimized / DLL files

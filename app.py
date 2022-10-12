@@ -164,6 +164,7 @@ async def read_tags():
     while True:
         tag = rfid_reader.read()
         if tag != 0:
+            tag = str(tag)
             if tag in key_store.contents:
                 key = key_store.contents[tag]
                 name = key['name']
@@ -176,6 +177,7 @@ async def read_tags():
                 # TODO: Play access granted
                 await gpio_unlock(5.0)
             else:
+                general_logger.info("key_store.contents = " + str(key_store.contents))
                 await app.client.chat_postMessage(
                     channel=config.channel,
                     text=f"Denied access to tag {tag}",

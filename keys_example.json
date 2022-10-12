@@ -1,7 +1,10 @@
 {
-    "2801F9D46B": {
-        "door": 2,
-        "groups": [],
+    "xxx1": {
+        "level": 3,
         "name": "Blake Samuels"
+    },
+    "xxx2": {
+        "level": 1,
+        "name": "Black Tag"
     }
 }
