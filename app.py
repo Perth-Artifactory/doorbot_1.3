@@ -34,6 +34,9 @@ class Config:
         self.keys_url = config["keys"]["url"]
         self.keys_cache_file = config["keys"]["cache_file"]
         self.level = config["level"]
+        self.admin_usergroup_id = config["admin_usergroup_id"]
+
+        self.admin_users = []
 
 # Load the config
 config = Config()
@@ -62,7 +65,7 @@ app = AsyncApp(token=config.SLACK_BOT_TOKEN)
 
 def check_auth(b):
     """Check whether a user/channel is authorised"""
-    if b['user']['id'] == 'U7DD219GF':  # tazard
+    if b['user']['id'] in config.admin_users:
         return True
     return False
 
@@ -80,14 +83,25 @@ def get_response_value(b):
 @app.event("app_home_opened")
 async def update_home_tab(client, event, logger):
     try:
-        # views.publish is the method that your app uses to push a view to the Home tab
-        await client.views_publish(
-            # the user that opened your app's app home
-            user_id=event["user"],
-            # the view object that appears in the app home
-            view=slack_blocks.home_view
-        )
-
+        # Update authorised users
+        response = await client.usergroups_users_list(usergroup=config.admin_usergroup_id)
+        config.admin_users = response['users']
+        
+        if event["user"] in config.admin_users:
+            # views.publish is the method that your app uses to push a view to the Home tab
+            await client.views_publish(
+                # the user that opened your app's app home
+                user_id=event["user"],
+                # the view object that appears in the app home
+                view=slack_blocks.home_view
+            )
+        else:
+            await client.views_publish(
+                # the user that opened your app's app home
+                user_id=event["user"],
+                # the view object that appears in the app home
+                view=slack_blocks.home_view_denied
+            )
     except Exception as e:
         logger.error(f"Error publishing home tab: {e}")
 

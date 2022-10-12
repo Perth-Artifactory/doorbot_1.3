@@ -102,6 +102,28 @@ home_view = {
     ]
 }
 
+
+# Displayed when user doesn't have access to home view
+home_view_denied = {
+    "type": "home",
+    "callback_id": "home_view",
+
+    # body of the view
+    "blocks":
+    [
+        {
+            "type": "section",
+            "text": 
+            {
+                "type": "plain_text",
+                "text": "You don't have access to the Doorbot admin page",
+                "emoji": True
+            }
+        },
+    ]
+}
+
+
 # Message posted when door access is being reported
 
 
