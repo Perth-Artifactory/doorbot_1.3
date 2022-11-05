@@ -62,10 +62,3 @@ class KeyReader:
         self.w_rfid = wiegand.decoder(self.pi, 5, 6, callback_rfid)
         self.w_nfc = wiegand.decoder(self.pi, 12, 13, callback_nfc)
 
-    def __del__(self):
-        self.w_rfid.cancel()
-        self.w_nfc.cancel()
-        self.pi.stop()
-
-
-
