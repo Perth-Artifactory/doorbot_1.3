@@ -160,10 +160,13 @@ if __name__ == "__main__":
 
    pi = pigpio.pi()
 
-   w = wiegand.decoder(pi, 5, 6, callback)
+   w_rfid = wiegand.decoder(pi, 5, 6, callback)
+
+   w_nfc = wiegand.decoder(pi, 12, 13, callback)
 
    time.sleep(300)
 
-   w.cancel()
+   w_rfid.cancel()
+   w_nfc.cancel()
 
    pi.stop()
