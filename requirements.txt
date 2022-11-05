@@ -1,1 +1,4 @@
-pywiegand
+pigpio
+BlinkStick
+requests
+slack-bolt
