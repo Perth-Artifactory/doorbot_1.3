@@ -13,7 +13,7 @@ from slack_bolt.app.async_app import AsyncApp
 
 import slack_blocks
 import doorbot_hat_gpio
-import weigand_rfid
+import wiegand_key_reader
 import blinkstick_interface
 import updating_config_loader
 
@@ -51,7 +51,7 @@ blink = blinkstick_interface.BlinkstickInterface()
 door_unlocked = False
 
 # Create RFID reader class
-rfid_reader = weigand_rfid.WeigandRfid()
+key_reader = wiegand_key_reader.KeyReader()
 
 # Object to manage retrieving and caching keys.
 # Construction does the first update.
@@ -176,8 +176,9 @@ async def read_tags():
     )
 
     while True:
-        tag = rfid_reader.read()
-        if tag != 0:
+        if len(wiegand_key_reader.pending_keys) > 0:
+            tag = wiegand_key_reader.pending_keys.pop(0)
+
             # Pad with zeros to 10 digits like API expects
             tag = f"{tag:0>10}"
             if tag in key_store.contents:
@@ -199,6 +200,13 @@ async def read_tags():
                     blocks=slack_blocks.door_access(name="Unknown", tag=tag, status=':x: Access denied', level="Unknown")
                 )
                 # TODO: Play access denied
+
+        if len(wiegand_key_reader.pending_errors) > 0:
+            msg = wiegand_key_reader.pending_errors.pop(0)
+            await app.client.chat_postMessage(
+                channel=config.channel,
+                text=f"Bad read: {msg}",
+            )
 
         await asyncio.sleep(0.1)
 
