@@ -24,5 +24,5 @@ pip install -r requirements.txt
 Start daemon:
 
 ```
-sudo pigpiod -s1
+sudo pigpiod
 ```
