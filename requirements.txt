@@ -1,4 +1,7 @@
-pigpio
-BlinkStick
-requests
 slack-bolt
+aiohttp
+requests
+pigpio
+RPi.GPIO
+BlinkStick
+pyusb
