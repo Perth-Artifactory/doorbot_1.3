@@ -5,8 +5,9 @@
     "slack_channel": "#doorbot-slack-test",
     "relay_channel": "R1",
     "keys": {
-        "url": "https://ip/api/v1/keys/door?token=xxxx",
+        "url": "http://enclave:5000/api/v1/keys/door?token=xxxx",
         "cache_file": "keys_cache.json"
     },
-    "level": 1
+    "level": 1,
+    "admin_usergroup_handle": "doorbot-admins"
 }
