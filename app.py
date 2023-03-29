@@ -34,7 +34,7 @@ class Config:
         self.keys_url = config["keys"]["url"]
         self.keys_cache_file = config["keys"]["cache_file"]
         self.level = config["level"]
-        self.admin_usergroup_id = config["admin_usergroup_id"]
+        self.admin_usergroup_handle = config["admin_usergroup_handle"]
 
         self.admin_users = []
 
@@ -83,8 +83,22 @@ def get_response_value(b):
 @app.event("app_home_opened")
 async def update_home_tab(client, event, logger):
     try:
+        # Get list of usergroups
+        # Call the usergroups.list method to retrieve information about all usergroups in your workspace
+        response = await client.usergroups_list(include_users=False)
+
+        # Iterate through the list of usergroups and find the one with the specified name
+        usergroup_id = None
+        for group in response["usergroups"]:
+            if group["handle"] == config.admin_usergroup_handle:
+                usergroup_id = group["id"]
+                break
+        
+        if usergroup_id is None:
+            raise Exception(f"Could not find usergroup '{config.admin_usergroup_name}'")
+
         # Update authorised users
-        response = await client.usergroups_users_list(usergroup=config.admin_usergroup_id)
+        response = await client.usergroups_users_list(usergroup=usergroup_id)
         config.admin_users = response['users']
         
         if event["user"] in config.admin_users:
