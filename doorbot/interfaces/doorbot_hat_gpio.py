@@ -55,7 +55,7 @@ class DebouncedInput:
             # Initialise to first value
             self.current_value = value
             return
-        
+
         elif not self.bouncing and value == self.current_value:
             # The boring, nothing has changed case
             pass
@@ -70,7 +70,7 @@ class DebouncedInput:
         elif self.bouncing and (time.monotonic() - self.last_bounce_time) <= self.wait_time_s:
             # We are in the time allowed for debounce, ignore changes
             pass
-         
+
         elif self.bouncing and (time.monotonic() - self.last_bounce_time) > self.wait_time_s:
             # We have finished the time allowed for debouncing, reset
             self.bouncing = False
@@ -104,7 +104,7 @@ class DoorbotHatGpio:
     def __init__(self):
         """
         Interface class to Doorbot Hat 1.3 digital inputs and outputs
-        
+
         Provides functions for setting relays on/off
         and functions for checking if switches are pressed.
         """

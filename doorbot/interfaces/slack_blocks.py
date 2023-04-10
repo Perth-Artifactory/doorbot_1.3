@@ -1,5 +1,5 @@
 """
-Separate file for blockkit blocks because they are huge and make code
+Separate file for Slack blockkit blocks because they are huge and make code
 hard to follow.
 """
 
@@ -113,7 +113,7 @@ home_view_denied = {
     [
         {
             "type": "section",
-            "text": 
+            "text":
             {
                 "type": "plain_text",
                 "text": "You don't have access to the Doorbot admin page",
@@ -124,14 +124,12 @@ home_view_denied = {
 }
 
 
-# Message posted when door access is being reported
-
-
 def door_access(name, tag, status, level):
+    """Message posted when door access is being reported"""
     return [
         {
             "type": "section",
-            "text": 
+            "text":
             {
                 "type": "plain_text",
                 "text": "Someone interacted with the door",
@@ -140,7 +138,7 @@ def door_access(name, tag, status, level):
         },
         {
             "type": "section",
-            "fields": 
+            "fields":
             [
                 {
                     "type": "mrkdwn",

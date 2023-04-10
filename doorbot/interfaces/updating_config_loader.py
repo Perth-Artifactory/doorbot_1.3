@@ -9,11 +9,12 @@ import json
 import os
 import requests
 
+
 class UpdatingConfigLoader:
     def __init__(self, local_path, remote_url, auth=None):
         """
         A single JSON string which retrieved from a URL and cached locally.
-        
+
         If URL is inaccessible or returns invalid data, the local file will be used.
         If the local file doesn't exist and URL gives valid response, file will be created.
         If both local file and URL are invalid, then exception will be raised.
@@ -42,7 +43,8 @@ class UpdatingConfigLoader:
             try:
                 self.contents = json.loads(file_str)
             except json.JSONDecodeError as e:
-                self.log("Bad cache file. JSONDecodeError: {}. File: \n{}".format(e, self.local_path))
+                self.log("Bad cache file. JSONDecodeError: {}. File: \n{}".format(
+                    e, self.local_path))
                 print(file_str)
                 self.contents = None
             else:
@@ -60,7 +62,7 @@ class UpdatingConfigLoader:
             s = "Error while loading '{}'. Exception: ({}) {}"
             self.log(s.format(self.remote_url, type(e), e))
             return
-        
+
         # Convert to JSON
         try:
             remote = json.loads(response.text)
@@ -91,7 +93,7 @@ class UpdatingConfigLoader:
             s = "Fatal Error - Invalid path for cache file '{}'. Exception: ({}) {}"
             self.log(s.format(self.local_path, type(e), e))
             raise
-        
+
     def pretty_dump_json(self):
         return json.dumps(self.contents, sort_keys=False, indent=4)
 
@@ -100,4 +102,3 @@ class UpdatingConfigLoader:
             s = "Fatal Error - Both URL and local file failed to load correctly: '{}', '{}'"
             self.log(s.format(self.local_path, self.remote_url))
             raise Exception("Failed to load")
-        
