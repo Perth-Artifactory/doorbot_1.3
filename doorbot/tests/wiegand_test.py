@@ -5,7 +5,7 @@ using Doorbot 1.3 hat.
 
 import time
 import pigpio
-import wiegand
+from doorbot.interfaces import wiegand
 
 if __name__ == "__main__":
     def callback(bits, value):

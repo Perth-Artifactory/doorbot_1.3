@@ -6,13 +6,14 @@ are stored in global lists. The main application can read these out whenever con
 """
 
 import pigpio
-import wiegand
+from doorbot.interfaces import wiegand
 
 # The callback adds keys to this list. So check here for new key reads.
 pending_keys = []
 
-# 
+#
 pending_errors = []
+
 
 def callback(bits, value, reader_type):
     """Called when a wiegand string is read"""
@@ -49,11 +50,14 @@ def callback(bits, value, reader_type):
         msg = f"ERROR ({reader_type=}): Unexpected Number Bits - {bits=}, {value=} (0x{value:0X})"
         pending_errors.append(msg)
 
+
 def callback_rfid(bits, value):
     callback(bits, value, "RFID")
 
+
 def callback_nfc(bits, value):
     callback(bits, value, "NFC")
+
 
 class KeyReader:
     def __init__(self):
@@ -61,4 +65,3 @@ class KeyReader:
         self.pi = pigpio.pi()
         self.w_rfid = wiegand.decoder(self.pi, 5, 6, callback_rfid)
         self.w_nfc = wiegand.decoder(self.pi, 12, 13, callback_nfc)
-

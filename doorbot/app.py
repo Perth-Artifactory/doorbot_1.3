@@ -10,18 +10,21 @@ import logging
 import json
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.app.async_app import AsyncApp
+import asyncio
 
-import slack_blocks
-import doorbot_hat_gpio
-import wiegand_key_reader
-import blinkstick_interface
-import updating_config_loader
+from doorbot.interfaces import slack_blocks
+from doorbot.interfaces import doorbot_hat_gpio
+from doorbot.interfaces import wiegand_key_reader
+from doorbot.interfaces import blinkstick_interface
+from doorbot.interfaces import updating_config_loader
 
 logging.basicConfig(level=logging.DEBUG)
 general_logger = logging.getLogger()
 
+
 class Config:
     """Config loader"""
+
     def __init__(self) -> None:
         with open("config.json", "r") as f:
             config = json.load(f)
@@ -37,6 +40,7 @@ class Config:
         self.admin_usergroup_handle = config["admin_usergroup_handle"]
 
         self.admin_users = []
+
 
 # Load the config
 config = Config()
@@ -63,14 +67,17 @@ key_store = updating_config_loader.UpdatingConfigLoader(
 # Load the slack bolt app framework
 app = AsyncApp(token=config.SLACK_BOT_TOKEN)
 
+
 def check_auth(b):
     """Check whether a user/channel is authorised"""
     if b['user']['id'] in config.admin_users:
         return True
     return False
 
+
 def get_user_name(b):
     return b['user']['name']
+
 
 def get_response_value(b):
     """Find the value action payload from dropdown"""
@@ -79,6 +86,7 @@ def get_response_value(b):
             return block['selected_option']['value']
         else:
             return block['value']
+
 
 @app.event("app_home_opened")
 async def update_home_tab(client, event, logger):
@@ -93,14 +101,15 @@ async def update_home_tab(client, event, logger):
             if group["handle"] == config.admin_usergroup_handle:
                 usergroup_id = group["id"]
                 break
-        
+
         if usergroup_id is None:
-            raise Exception(f"Could not find usergroup '{config.admin_usergroup_name}'")
+            raise Exception(
+                f"Could not find usergroup '{config.admin_usergroup_name}'")
 
         # Update authorised users
         response = await client.usergroups_users_list(usergroup=usergroup_id)
         config.admin_users = response['users']
-        
+
         if event["user"] in config.admin_users:
             # views.publish is the method that your app uses to push a view to the Home tab
             await client.views_publish(
@@ -119,6 +128,7 @@ async def update_home_tab(client, event, logger):
     except Exception as e:
         logger.error(f"Error publishing home tab: {e}")
 
+
 @app.action("sendMessage")
 async def handle_send_message(ack, body, logger):
     await ack()
@@ -127,13 +137,14 @@ async def handle_send_message(ack, body, logger):
         value = get_response_value(body)
         logger.info(f"SEND MESSAGE = {value}")
         await post_slack_log(f"Admin '{get_user_name(body)}' played message: {value}")
-        messages = {"key_disabled":"noticeDisabled",
-                    "volunteer_contact":"noticeContact",
-                    "covid":"noticeCOVID",
-                    "notice_you":"noticePresence"}
+        messages = {"key_disabled": "noticeDisabled",
+                    "volunteer_contact": "noticeContact",
+                    "covid": "noticeCOVID",
+                    "notice_you": "noticePresence"}
         # value = findValue(body,"sendMessage")
         # say("<@{}> sent the predefined message '{}'".format(body['user']['id'], value))
         # play(messages[value],OS="WIN")
+
 
 @app.action("ttsMessage")
 async def handle_tts_message(ack, body, logger):
@@ -143,6 +154,7 @@ async def handle_tts_message(ack, body, logger):
         value = get_response_value(body)
         await post_slack_log(f"Admin '{get_user_name(body)}' played TTS: {value}")
         logger.info(f"TTS MESSAGE = {value}")
+
 
 @app.action("unlock")
 async def handle_unlock(ack, body, logger):
@@ -159,6 +171,7 @@ async def handle_unlock(ack, body, logger):
             await post_slack_log(f"Admin '{get_user_name(body)}' manually opened door for {time_s:.1f} seconds")
             logger.info(f"DOOR UNLOCK = {time_s:.1f} seconds")
             await gpio_unlock(time_s)
+
 
 async def post_slack_log(message):
     await app.client.chat_postMessage(
@@ -202,16 +215,19 @@ async def read_tags():
                 await app.client.chat_postMessage(
                     channel=config.channel,
                     text=f"Unlocking door for {name}",
-                    blocks=slack_blocks.door_access(name=name, tag=tag, status=':white_check_mark: Door unlocked', level=level)
+                    blocks=slack_blocks.door_access(
+                        name=name, tag=tag, status=':white_check_mark: Door unlocked', level=level)
                 )
                 # TODO: Play access granted
                 await gpio_unlock(5.0)
             else:
-                general_logger.info("key_store.contents = " + str(key_store.contents))
+                general_logger.info(
+                    "key_store.contents = " + str(key_store.contents))
                 await app.client.chat_postMessage(
                     channel=config.channel,
                     text=f"Denied access to tag {tag}",
-                    blocks=slack_blocks.door_access(name="Unknown", tag=tag, status=':x: Access denied', level="Unknown")
+                    blocks=slack_blocks.door_access(
+                        name="Unknown", tag=tag, status=':x: Access denied', level="Unknown")
                 )
                 # TODO: Play access denied
 
@@ -224,19 +240,25 @@ async def read_tags():
 
         await asyncio.sleep(0.1)
 
+
 async def update_keys():
     """Worker coroutine to refresh keys from the API"""
     while True:
         await asyncio.sleep(60)
         key_store.update_from_url()
 
-async def main():
+
+async def run():
+    general_logger.info("Starting up")
     asyncio.ensure_future(read_tags())
     asyncio.ensure_future(update_keys())
     handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
     await handler.start_async()
 
+
+def main():
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
-    general_logger.info("Starting up")
-    import asyncio
-    asyncio.run(main())
+    main()

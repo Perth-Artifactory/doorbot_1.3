@@ -1,5 +1,5 @@
 import time
-import wiegand_key_reader
+from doorbot.interfaces import wiegand_key_reader
 
 reader = wiegand_key_reader.KeyReader()
 
