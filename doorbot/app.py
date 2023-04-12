@@ -5,7 +5,6 @@ RFID and NFC based access control system for the Perth Artifactory.
 Interfaces with Slack and other services for administration and logging.
 """
 
-import os
 import logging
 import json
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
@@ -244,6 +243,7 @@ async def read_tags():
 async def update_keys():
     """Worker coroutine to refresh keys from the API"""
     while True:
+        # First update is done by construction of key_store so we wait first here
         await asyncio.sleep(60)
         key_store.update_from_url()
 
