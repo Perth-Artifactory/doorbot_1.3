@@ -7,8 +7,9 @@ Compatibility: Python3
 """
 
 import time
-import RPi.GPIO as GPIO
+import pigpio
 
+pi = pigpio.pi()
 
 # Input switch debounce time
 DEBOUNCE_WAIT_S = 0.1
@@ -45,7 +46,7 @@ class DebouncedInput:
     def update(self):
         # value = High: Open circuit (switch not pressed)
         #         Low: Closed circuit (switch pressed)
-        value = GPIO.input(self.pin)
+        value = pi.read(self.pin)
 
         # Normally high inputs (open circuit is pullup)
         # Invert so that unpressed buttons are low and pressed is high
@@ -97,7 +98,7 @@ class RelayOutput:
             state = relay_on
         else:
             state = not relay_on
-        GPIO.output(self.pin, state)
+        pi.write(self.pin, state)
 
 
 class DoorbotHatGpio:
@@ -110,8 +111,10 @@ class DoorbotHatGpio:
         """
         self.log("Setup start")
 
-        # Use BCM pin map
-        GPIO.setmode(GPIO.BCM)
+        # On first boot, needs a bit of time or relays sometimes go haywire
+        time.sleep(1)
+
+        # pigpio uses BCM (Broadcom SOC channel) numbering by default
 
         self.switches = {}
         self.setup_switches(id=ID_SWITCH_1, pin=23)
@@ -128,22 +131,27 @@ class DoorbotHatGpio:
         self.log("Setup complete")
 
     def __del__(self):
-        GPIO.cleanup()
+        self.log("Stopping pigpio")
+        pi.stop()
+
+        # On shutdown, needs a bit of time or sometimes goes haywire (first boot)
+        time.sleep(1)
 
     def log(self, message: str):
         print("[DoorbotHatInterface] {}".format(message))
 
     def setup_switches(self, id, pin):
         # Set pin direction
-        GPIO.setup(pin, GPIO.IN)
+        pi.set_mode(pin, pigpio.INPUT)
+        pi.set_pull_up_down(pin, pigpio.PUD_UP)
         # Create the debouncer object
         self.switches[id] = DebouncedInput(pin)
 
     def setup_relays(self, id, pin):
         # Set pin direction
-        GPIO.setup(pin, GPIO.OUT)
+        pi.set_mode(pin, pigpio.OUTPUT)
         # Initialise pin as relay off
-        GPIO.output(pin, RELAY_OFF)
+        pi.write(pin, RELAY_OFF)
         # Create the relay object
         self.relays[id] = RelayOutput(pin)
 
