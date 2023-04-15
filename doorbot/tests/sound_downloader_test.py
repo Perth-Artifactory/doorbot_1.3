@@ -1,6 +1,9 @@
 import argparse
 from doorbot.interfaces.sound_downloader import SoundDownloader
 from doorbot.interfaces.tidyauth_client import DoorKeysClient
+import time
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Usage
 download_directory = "sounds/custom"
@@ -24,4 +27,6 @@ door_keys = client.get_door_keys()
 sound_downloader = SoundDownloader(client, door_keys, download_directory)
 
 # Download the sound files
-sound_downloader.download_sounds()
+while sound_downloader.download_next_sound():
+    print('got another!')
+    time.sleep(0.01)

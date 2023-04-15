@@ -2,6 +2,9 @@
 import argparse
 from doorbot.interfaces.tidyauth_client import DoorKeysClient
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 parser = argparse.ArgumentParser()
 parser.add_argument('token')
 args = parser.parse_args()
