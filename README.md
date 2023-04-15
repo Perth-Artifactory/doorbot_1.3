@@ -3,6 +3,12 @@ DoorBot 1.3 consisting of a Raspberry Pi 2 and custom made DoorBot v1.3 shield
 
 ## Installation
 
+Install this package (required for mp3s in `pygame`):
+```
+sudo apt-get install python3-pygame
+sudo apt-get install python3-sdl2
+```
+
 Create virtual environment
 ```
 python3 -m venv .venv
