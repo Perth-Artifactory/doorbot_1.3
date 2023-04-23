@@ -4,7 +4,7 @@ sounds/custom
 .venv
 *.csv
 config.json
-keys_cache.json
+user_cache.json
 
 # ____ Generic Python ignores _____
 # Byte-compiled / optimized / DLL files

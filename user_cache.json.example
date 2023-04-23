@@ -1,0 +1,16 @@
+{
+    "0123456789": {
+        "door": 3,
+        "groups": [],
+        "name": "Gentleman",
+        "sound": "cd3d9dd904aca51abc55dbe7b7cc7b28",
+        "tidyhq": 4321,
+        "sound_url": "https://s3.tidyhq.com/orgs/04f852fe3b0f/df/18a3b945eecbb26a29a3b8a603e7591b73ead550/gadget_whoo.mp3"
+    },
+    "9876543210": {
+        "door": 1,
+        "groups": [],
+        "name": "Lady",
+        "tidyhq": 1234
+    }
+}
