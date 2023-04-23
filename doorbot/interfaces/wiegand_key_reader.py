@@ -5,14 +5,9 @@ Since the callback is probably coming from another thread, the keys and any erro
 are stored in global lists. The main application can read these out whenever convenient.
 """
 
-import pigpio
 from doorbot.interfaces import wiegand
 
-# The callback adds keys to this list. So check here for new key reads.
-pending_keys = []
-
-#
-pending_errors = []
+singleton_key_reader = None
 
 
 def callback(bits, value, reader_type):
@@ -41,14 +36,14 @@ def callback(bits, value, reader_type):
         if trailing_parity_odd and leading_parity_even:
             # Extract the card value from inner 24-bits (drop first and last parity bits)
             card_id = (value >> 1) & (2**(bits-2)-1)
-            pending_keys.append(card_id)
+            singleton_key_reader.pending_keys.append(card_id)
         else:
             msg = f"ERROR ({reader_type=}): Invalid Parity - {value} (0x{value:0X})"
-            pending_errors.append(msg)
+            singleton_key_reader.pending_errors.append(msg)
 
     else:
         msg = f"ERROR ({reader_type=}): Unexpected Number Bits - {bits=}, {value=} (0x{value:0X})"
-        pending_errors.append(msg)
+        singleton_key_reader.pending_errors.append(msg)
 
 
 def callback_rfid(bits, value):
@@ -60,8 +55,19 @@ def callback_nfc(bits, value):
 
 
 class KeyReader:
-    def __init__(self):
-        """Sets up decoders for RFID and NFC. When keys are read, callback will be called."""
-        self.pi = pigpio.pi()
+    def __init__(self, pigpio_pi):
+        """
+        Sets up decoders for RFID and NFC. When keys are read, keys will get 
+        stored in pending_keys if valid or pending_errors if not.
+        """
+        # The callback adds keys to this list. So check here for new key reads.
+        self.pending_keys = []
+        self.pending_errors = []
+
+        # Set this instance as the singleton for callbacks
+        global singleton_key_reader
+        singleton_key_reader = self
+
+        self.pi = pigpio_pi
         self.w_rfid = wiegand.decoder(self.pi, 5, 6, callback_rfid)
         self.w_nfc = wiegand.decoder(self.pi, 12, 13, callback_nfc)

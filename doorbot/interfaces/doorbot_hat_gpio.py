@@ -9,8 +9,6 @@ Compatibility: Python3
 import time
 import pigpio
 
-pi = pigpio.pi()
-
 # Input switch debounce time
 DEBOUNCE_WAIT_S = 0.1
 # Boolean state of GPIO output to turn relay on
@@ -31,11 +29,12 @@ ID_RELAY_4 = 'R4'
 
 
 class DebouncedInput:
-    def __init__(self, pin: int):
+    def __init__(self, pigpio_pi, pin: int):
         """
         Debounces a digital input pin by ignoring transitions for certain time.
         Inverts value so that HIGH is switch pressed and LOW is unpressed.
         """
+        self.pi = pigpio_pi
         self.pin = pin
         self.wait_time_s = DEBOUNCE_WAIT_S
         self.current_value = None
@@ -46,7 +45,7 @@ class DebouncedInput:
     def update(self):
         # value = High: Open circuit (switch not pressed)
         #         Low: Closed circuit (switch pressed)
-        value = pi.read(self.pin)
+        value = self.pi.read(self.pin)
 
         # Normally high inputs (open circuit is pullup)
         # Invert so that unpressed buttons are low and pressed is high
@@ -88,7 +87,8 @@ class DebouncedInput:
 
 
 class RelayOutput:
-    def __init__(self, pin: int):
+    def __init__(self, pigpio_pi, pin: int):
+        self.pi = pigpio_pi
         self.pin = pin
 
     def set(self, relay_on: bool):
@@ -98,11 +98,11 @@ class RelayOutput:
             state = relay_on
         else:
             state = not relay_on
-        pi.write(self.pin, state)
+        self.pi.write(self.pin, state)
 
 
 class DoorbotHatGpio:
-    def __init__(self):
+    def __init__(self, pigpio_pi):
         """
         Interface class to Doorbot Hat 1.3 digital inputs and outputs
 
@@ -115,6 +115,7 @@ class DoorbotHatGpio:
         time.sleep(1)
 
         # pigpio uses BCM (Broadcom SOC channel) numbering by default
+        self.pi = pigpio_pi
 
         self.switches = {}
         self.setup_switches(id=ID_SWITCH_1, pin=23)
@@ -132,7 +133,7 @@ class DoorbotHatGpio:
 
     def __del__(self):
         self.log("Stopping pigpio")
-        pi.stop()
+        self.pi.stop()
 
         # On shutdown, needs a bit of time or sometimes goes haywire (first boot)
         time.sleep(1)
@@ -142,18 +143,18 @@ class DoorbotHatGpio:
 
     def setup_switches(self, id, pin):
         # Set pin direction
-        pi.set_mode(pin, pigpio.INPUT)
-        pi.set_pull_up_down(pin, pigpio.PUD_UP)
+        self.pi.set_mode(pin, pigpio.INPUT)
+        self.pi.set_pull_up_down(pin, pigpio.PUD_UP)
         # Create the debouncer object
-        self.switches[id] = DebouncedInput(pin)
+        self.switches[id] = DebouncedInput(self.pi, pin)
 
     def setup_relays(self, id, pin):
         # Set pin direction
-        pi.set_mode(pin, pigpio.OUTPUT)
+        self.pi.set_mode(pin, pigpio.OUTPUT)
         # Initialise pin as relay off
-        pi.write(pin, RELAY_OFF)
+        self.pi.write(pin, RELAY_OFF)
         # Create the relay object
-        self.relays[id] = RelayOutput(pin)
+        self.relays[id] = RelayOutput(self.pi, pin)
 
     def set_relay(self, id, relay_on: bool):
         """Set state of given relay on doorbot hat"""
