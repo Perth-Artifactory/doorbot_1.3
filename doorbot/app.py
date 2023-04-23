@@ -10,16 +10,21 @@ import json
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.app.async_app import AsyncApp
 import asyncio
+import pigpio
 
 from doorbot.interfaces import slack_blocks
-from doorbot.interfaces import doorbot_hat_gpio
-from doorbot.interfaces import wiegand_key_reader
-from doorbot.interfaces import blinkstick_interface
-from doorbot.interfaces import updating_config_loader
+from doorbot.interfaces.doorbot_hat_gpio import DoorbotHatGpio
+from doorbot.interfaces.wiegand_key_reader import KeyReader
+from doorbot.interfaces.blinkstick_interface import BlinkstickInterface
+from doorbot.interfaces.tidyauth_client import TidyAuthClient
+from doorbot.interfaces.user_manager import UserManager
+from doorbot.interfaces.sound_downloader import SoundDownloader
+from doorbot.interfaces.sound_player import SoundPlayer
 
 logging.basicConfig(level=logging.DEBUG)
 general_logger = logging.getLogger()
 
+# ======= Config =======
 
 class Config:
     """Config loader"""
@@ -28,15 +33,18 @@ class Config:
         with open("config.json", "r") as f:
             config = json.load(f)
 
+        self.mock_raspberry_pi = config["mock_raspberry_pi"]
         self.SLACK_APP_TOKEN = config["SLACK_APP_TOKEN"]
         self.SLACK_BOT_TOKEN = config["SLACK_BOT_TOKEN"]
-        self.mock_raspberry_pi = config["mock_raspberry_pi"]
         self.channel = config["slack_channel"]
-        self.relay_channel = config["relay_channel"]
-        self.keys_url = config["keys"]["url"]
-        self.keys_cache_file = config["keys"]["cache_file"]
-        self.level = config["level"]
         self.admin_usergroup_handle = config["admin_usergroup_handle"]
+        self.relay_channel = config["relay_channel"]
+        self.tidyauth_url = config["tidyauth"]["url"]
+        self.tidyauth_token = config["tidyauth"]["token"]
+        self.tidyauth_cache_file = config["tidyauth"]["cache_file"]
+        self.tidyauth_update_interval_seconds = config["tidyauth"]["update_interval_seconds"]
+        self.sounds_dir = config["sounds_dir"]
+        self.custom_sounds_dir = config["custom_sounds_dir"]
 
         self.admin_users = []
 
@@ -44,38 +52,56 @@ class Config:
 # Load the config
 config = Config()
 
+
+# ======= Setup =======
+
+# App should only create this once
+pigpio_pi = pigpio.pi()
+
 # Load the Doorbot hat GPIO
-hat_gpio = doorbot_hat_gpio.DoorbotHatGpio()
+hat_gpio = DoorbotHatGpio(pigpio_pi)
+
+# Create RFID reader class
+key_reader = KeyReader(pigpio_pi)
 
 # Blinkstick - more LEDs!
-blink = blinkstick_interface.BlinkstickInterface()
+blink = BlinkstickInterface()
 
 # Flag to stop async unlock function running in parallel
 door_unlocked = False
 
-# Create RFID reader class
-key_reader = wiegand_key_reader.KeyReader()
+# TidyAuth API Client
+tidyauth_client = TidyAuthClient(base_url=config.tidyauth_url, token=config.tidyauth_token)
 
-# Object to manage retrieving and caching keys.
-# Construction does the first update.
-key_store = updating_config_loader.UpdatingConfigLoader(
-    local_path=config.keys_cache_file,
-    remote_url=config.keys_url,
-)
+# User manager, using tidyauth API
+user_manager = UserManager(api_client=tidyauth_client, cache_path=config.tidyauth_cache_file)
+
+# Sound player
+sound_player = SoundPlayer(sound_dir=config.sounds_dir, custom_sound_dir=config.custom_sounds_dir)
 
 # Load the slack bolt app framework
 app = AsyncApp(token=config.SLACK_BOT_TOKEN)
 
 
+# ======= Helper Methods =======
+
 def check_auth(b):
-    """Check whether a user/channel is authorised"""
-    if b['user']['id'] in config.admin_users:
-        return True
+    """Check whether a user/channel is authorised to control doorbot via slack"""
+    try:
+        if b['user']['id'] in config.admin_users:
+            return True
+    except KeyError as e:
+        general_logger.error(f'check_auth exception: {e}')
+        pass
     return False
 
 
 def get_user_name(b):
-    return b['user']['name']
+    try:
+        return b['user']['name']
+    except KeyError as e:
+        general_logger.error(f'get_user_name exception: {e}')
+        return "Unknown"
 
 
 def get_response_value(b):
@@ -87,29 +113,60 @@ def get_response_value(b):
             return block['value']
 
 
+async def post_slack_log(message):
+    await app.client.chat_postMessage(
+        channel=config.channel,
+        text=message,
+    )
+
+
+async def update_admin_users(client):
+    # Get list of usergroups
+    # Call the usergroups.list method to retrieve information about all usergroups in your workspace
+    response = await client.usergroups_list(include_users=False)
+
+    # Iterate through the list of usergroups and find the one with the specified name
+    usergroup_id = None
+    for group in response["usergroups"]:
+        if group["handle"] == config.admin_usergroup_handle:
+            usergroup_id = group["id"]
+            break
+
+    if usergroup_id is None:
+        raise Exception(
+            f"Could not find usergroup '{config.admin_usergroup_name}'")
+
+    # Update authorised users
+    response = await client.usergroups_users_list(usergroup=usergroup_id)
+    config.admin_users = response['users']
+    general_logger.debug(f"Admin users are: {', '.join(config.admin_users)}")
+
+
+async def gpio_unlock(time_s: float):
+    # Use "door_unlocked" like a lock/mutex to ensure this doesn't run in parallel
+    global door_unlocked
+    if not door_unlocked:
+        door_unlocked = True
+
+        hat_gpio.set_relay(config.relay_channel, True)
+        general_logger.info(f"DoorbotHatGpio UNLOCKED DOOR")
+        await asyncio.sleep(time_s)
+        hat_gpio.set_relay(config.relay_channel, False)
+        general_logger.info(f"DoorbotHatGpio LOCK DOOR")
+
+        door_unlocked = False
+
+
+# ======= Slack Handlers =======
+
 @app.event("app_home_opened")
 async def update_home_tab(client, event, logger):
     try:
-        # Get list of usergroups
-        # Call the usergroups.list method to retrieve information about all usergroups in your workspace
-        response = await client.usergroups_list(include_users=False)
-
-        # Iterate through the list of usergroups and find the one with the specified name
-        usergroup_id = None
-        for group in response["usergroups"]:
-            if group["handle"] == config.admin_usergroup_handle:
-                usergroup_id = group["id"]
-                break
-
-        if usergroup_id is None:
-            raise Exception(
-                f"Could not find usergroup '{config.admin_usergroup_name}'")
-
-        # Update authorised users
-        response = await client.usergroups_users_list(usergroup=usergroup_id)
-        config.admin_users = response['users']
+        # Make sure we have a fresh list of admin users
+        await update_admin_users(client)
 
         if event["user"] in config.admin_users:
+            # User is allowed to control doorbot via slack
             # views.publish is the method that your app uses to push a view to the Home tab
             await client.views_publish(
                 # the user that opened your app's app home
@@ -118,10 +175,9 @@ async def update_home_tab(client, event, logger):
                 view=slack_blocks.home_view
             )
         else:
+            # User is not allowed to control doorbot via slack
             await client.views_publish(
-                # the user that opened your app's app home
                 user_id=event["user"],
-                # the view object that appears in the app home
                 view=slack_blocks.home_view_denied
             )
     except Exception as e:
@@ -172,27 +228,7 @@ async def handle_unlock(ack, body, logger):
             await gpio_unlock(time_s)
 
 
-async def post_slack_log(message):
-    await app.client.chat_postMessage(
-        channel=config.channel,
-        text=message,
-    )
-
-
-async def gpio_unlock(time_s: float):
-    # Use "door_unlocked" like a lock/mutex to ensure this doesn't run in parallel
-    global door_unlocked
-    if not door_unlocked:
-        door_unlocked = True
-
-        hat_gpio.set_relay(config.relay_channel, True)
-        general_logger.info(f"DoorbotHatGpio UNLOCKED DOOR")
-        await asyncio.sleep(time_s)
-        hat_gpio.set_relay(config.relay_channel, False)
-        general_logger.info(f"DoorbotHatGpio LOCK DOOR")
-
-        door_unlocked = False
-
+# ======= Background Tasks =======
 
 async def read_tags():
     """Main worker coroutine to poll the RFID reader and unlock the door"""
@@ -202,36 +238,39 @@ async def read_tags():
     )
 
     while True:
-        if len(wiegand_key_reader.pending_keys) > 0:
-            tag = wiegand_key_reader.pending_keys.pop(0)
+        if len(key_reader.pending_keys) > 0:
+            tag = key_reader.pending_keys.pop(0)
 
             # Pad with zeros to 10 digits like API expects
             tag = f"{tag:0>10}"
-            if tag in key_store.contents:
-                key = key_store.contents[tag]
-                name = key['name']
-                level = key['door']
+            if user_manager.is_key_authorised(tag):
+                # Access granted
+                user = user_manager.get_user_details(tag)
+                name = user['name']
+                level = user['door']
+                general_logger.info(f"Access granted: tag = '{tag}', user = {str(user)}")
                 await app.client.chat_postMessage(
                     channel=config.channel,
                     text=f"Unlocking door for {name}",
                     blocks=slack_blocks.door_access(
                         name=name, tag=tag, status=':white_check_mark: Door unlocked', level=level)
                 )
-                # TODO: Play access granted
+                sound_player.play_access_granted_or_custom(user)
                 await gpio_unlock(5.0)
             else:
-                general_logger.info(
-                    "key_store.contents = " + str(key_store.contents))
+                # Access denied
+                general_logger.info(f"Access denied: tag = '{tag}'")
                 await app.client.chat_postMessage(
                     channel=config.channel,
                     text=f"Denied access to tag {tag}",
                     blocks=slack_blocks.door_access(
                         name="Unknown", tag=tag, status=':x: Access denied', level="Unknown")
                 )
-                # TODO: Play access denied
+                sound_player.play_denied()
 
-        if len(wiegand_key_reader.pending_errors) > 0:
-            msg = wiegand_key_reader.pending_errors.pop(0)
+        if len(key_reader.pending_errors) > 0:
+            msg = key_reader.pending_errors.pop(0)
+            general_logger.info(f"Bad read: {msg}")
             await app.client.chat_postMessage(
                 channel=config.channel,
                 text=f"Bad read: {msg}",
@@ -243,15 +282,36 @@ async def read_tags():
 async def update_keys():
     """Worker coroutine to refresh keys from the API"""
     while True:
-        # First update is done by construction of key_store so we wait first here
-        await asyncio.sleep(60)
-        key_store.update_from_url()
+        # First update is done by construction of user_manager so first time 
+        # through loop, we wait
+        await asyncio.sleep(config.tidyauth_update_interval_seconds)
+        general_logger.debug("Update data from tidyauth")
+        changed = user_manager.download_keys()
+        if changed:
+            await download_sounds()
 
+
+async def download_sounds():
+    """Worker coroutine download sounds"""
+    users = user_manager.get_users_with_custom_sounds()
+    general_logger.debug(f"Check if sounds need downloading for {len(users)} users")
+    sound_downloader = SoundDownloader(
+        users_with_custom_sounds=users, 
+        download_directory=config.custom_sounds_dir)
+
+    # Download the sound files
+    while sound_downloader.download_next_sound():
+        # Allow other things to run between sound file downloads
+        await asyncio.sleep(0.5)
+
+
+# ======= Main =======
 
 async def run():
     general_logger.info("Starting up")
     asyncio.ensure_future(read_tags())
     asyncio.ensure_future(update_keys())
+    asyncio.ensure_future(download_sounds())
     handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
     await handler.start_async()
 

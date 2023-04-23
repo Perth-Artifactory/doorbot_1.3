@@ -1,13 +1,16 @@
 {
+    "mock_raspberry_pi": false,
     "SLACK_APP_TOKEN": "",
     "SLACK_BOT_TOKEN": "",
-    "mock_raspberry_pi": false,
     "slack_channel": "#doorbot-slack-test",
+    "admin_usergroup_handle": "doorbot-admins",
     "relay_channel": "R1",
-    "keys": {
-        "url": "http://enclave:5000/api/v1/keys/door?token=xxxx",
-        "cache_file": "keys_cache.json"
+    "tidyauth": {
+        "url": "http://enclave:5000",
+        "token": "",
+        "cache_file": "user_cache.json",
+        "update_interval_seconds": 60.0
     },
-    "level": 1,
-    "admin_usergroup_handle": "doorbot-admins"
+    "sounds_dir": "sounds",
+    "custom_sounds_dir": "sounds/custom"
 }

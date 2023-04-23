@@ -36,7 +36,10 @@ class UserManager:
         return {key: user for key, user in self.user_data.items() if "sound" in user}
 
     def download_keys(self):
-        """Download keys and populate custom sound info"""
+        """
+        Download keys and populate custom sound info.
+        Returns True if keys changed.
+        """
         # Download keys
         new_keys = self.api_client.get_door_keys()
 
@@ -63,6 +66,8 @@ class UserManager:
                 # Keys successfully downloaded and are different, save
                 self.user_data = new_keys
                 self._save_keys()
+                return True
+        return False
 
     def _load_keys(self):
         if os.path.exists(self.cache_path):
