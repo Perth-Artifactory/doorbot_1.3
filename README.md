@@ -9,6 +9,11 @@ sudo apt-get install python3-pygame
 sudo apt-get install python3-sdl2
 ```
 
+Install this package for TTS:
+```
+sudo apt-get install espeak
+```
+
 Create virtual environment
 ```
 python3 -m venv .venv
@@ -34,5 +39,5 @@ source .venv/bin/activate
 
 Run the app
 ```
-python app.py
+python -m doorbot
 ```

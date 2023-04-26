@@ -6,3 +6,4 @@ RPi.GPIO
 BlinkStick
 pyusb
 pygame
+pyttsx3
