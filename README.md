@@ -32,6 +32,11 @@ sudo systemctl start pigpiod
 
 ## Run
 
+Restart pigpiod at least once after boot to prevent random relay toggle glitch
+```
+sudo systemctl restart pigpiod
+```
+
 Run this in commandline to activate the python virtual environment:
 ```
 source .venv/bin/activate
