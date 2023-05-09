@@ -126,36 +126,13 @@ home_view_denied = {
 
 def door_access(name, tag, status, level):
     """Message posted when door access is being reported"""
-    return [
-        {
-            "type": "section",
-            "text":
-            {
-                "type": "plain_text",
-                "text": "Someone interacted with the door",
-                "emoji": True
-            }
-        },
-        {
-            "type": "section",
-            "fields":
-            [
-                {
-                    "type": "mrkdwn",
-                    "text": f"*Name:*\n{name}"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": f"*RFID:*\n{tag}"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": f"*Status:*\n{status}"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": f"*Level:*\n{level}"
-                }
-            ]
-        }
-    ]
+    attachments = [{"fields": [
+        {"title": "Name", "value": name, "short": True},
+        {"title": "Tag", "value": tag, "short": True},
+        {"title": "Status", "value": status, "short": True},
+        {"title": "Level", "value": level, "short": True}
+    ]}]
+    return {
+        'text': "Someone interacted with the door",
+        'attachments': attachments,
+    }

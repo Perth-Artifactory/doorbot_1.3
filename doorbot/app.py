@@ -260,9 +260,8 @@ async def read_tags():
                 general_logger.info(f"Access granted: tag = '{tag}', user = {str(user)}")
                 await app.client.chat_postMessage(
                     channel=config.channel,
-                    text=f"Unlocking door for {name}",
-                    blocks=slack_blocks.door_access(
-                        name=name, tag=tag, status=':white_check_mark: Door unlocked', level=level)
+                    **slack_blocks.door_access(
+                        name=name, tag=tag, status=':white_check_mark: Door unlocked', level=level),
                 )
                 sound_player.play_access_granted_or_custom(user)
                 await gpio_unlock(5.0)
@@ -271,8 +270,7 @@ async def read_tags():
                 general_logger.info(f"Access denied: tag = '{tag}'")
                 await app.client.chat_postMessage(
                     channel=config.channel,
-                    text=f"Denied access to tag {tag}",
-                    blocks=slack_blocks.door_access(
+                    **slack_blocks.door_access(
                         name="Unknown", tag=tag, status=':x: Access denied', level="Unknown")
                 )
                 sound_player.play_denied()
