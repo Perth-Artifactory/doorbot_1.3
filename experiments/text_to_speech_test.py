@@ -1,4 +1,5 @@
 import pyttsx3
+import time
 
 def speak_text(text):
     engine = pyttsx3.init()
@@ -10,7 +11,16 @@ def speak_text(text):
 
     engine.say(text)
     engine.runAndWait()
-
+    # if not engine.isBusy():
+    #     time.sleep(0.1)
+    
 if __name__ == "__main__":
     text = "Hello, I am an offline text-to-speech program running on Raspberry Pi."
     speak_text(text)
+    print("done1")
+
+    time.sleep(1)
+
+    text = "This is another test"
+    speak_text(text)
+

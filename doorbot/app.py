@@ -20,6 +20,7 @@ from doorbot.interfaces.tidyauth_client import TidyAuthClient
 from doorbot.interfaces.user_manager import UserManager
 from doorbot.interfaces.sound_downloader import SoundDownloader
 from doorbot.interfaces.sound_player import SoundPlayer
+from doorbot.interfaces import text_to_speech
 
 logging.basicConfig(level=logging.DEBUG)
 general_logger = logging.getLogger()
@@ -189,16 +190,19 @@ async def handle_send_message(ack, body, logger):
     await ack()
     logger.info("app.action 'sendMessage':" + str(body))
     if check_auth(body):
-        value = get_response_value(body)
-        logger.info(f"SEND MESSAGE = {value}")
-        await post_slack_log(f"Admin '{get_user_name(body)}' played message: {value}")
+        key = get_response_value(body)
+        logger.info(f"SEND MESSAGE = {key}")
+        await post_slack_log(f"Admin '{get_user_name(body)}' played message: {key}")
         messages = {"key_disabled": "noticeDisabled",
                     "volunteer_contact": "noticeContact",
                     "covid": "noticeCOVID",
                     "notice_you": "noticePresence"}
-        # value = findValue(body,"sendMessage")
-        # say("<@{}> sent the predefined message '{}'".format(body['user']['id'], value))
-        # play(messages[value],OS="WIN")
+        if key in messages:
+            text_to_speech.non_blocking_speak(messages[key])
+        else:
+            logger.error(f"{key} was not a valid predefined message")
+    else:
+        logger.error(f"User not authorised for admin access. Allowed = '{config.admin_users}'.")
 
 
 @app.action("ttsMessage")
@@ -206,9 +210,12 @@ async def handle_tts_message(ack, body, logger):
     await ack()
     logger.info("app.action 'ttsMessage':" + str(body))
     if check_auth(body):
-        value = get_response_value(body)
-        await post_slack_log(f"Admin '{get_user_name(body)}' played TTS: {value}")
-        logger.info(f"TTS MESSAGE = {value}")
+        text = get_response_value(body)
+        await post_slack_log(f"Admin '{get_user_name(body)}' played TTS: {text}")
+        logger.info(f"TTS MESSAGE = {text}")
+        text_to_speech.non_blocking_speak(text)
+    else:
+        logger.error(f"User not authorised for admin access. Allowed = '{config.admin_users}'.")
 
 
 @app.action("unlock")
@@ -226,6 +233,8 @@ async def handle_unlock(ack, body, logger):
             await post_slack_log(f"Admin '{get_user_name(body)}' manually opened door for {time_s:.1f} seconds")
             logger.info(f"DOOR UNLOCK = {time_s:.1f} seconds")
             await gpio_unlock(time_s)
+    else:
+        logger.error(f"User not authorised for admin access. Allowed = '{config.admin_users}'.")
 
 
 # ======= Background Tasks =======
