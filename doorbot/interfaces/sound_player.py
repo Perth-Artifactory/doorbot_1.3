@@ -33,12 +33,12 @@ class SoundPlayer:
                 logger.warn(f"Could not find custom sound for '{username}': '{sound_hash}', falling back to default")
 
         logger.debug(f"Playing access granted for '{username}': {sound_to_play}")
-        self._play_sound(sound_to_play)        
+        self.play_sound(sound_to_play)        
 
     def play_denied(self):
         logger.debug(f"Playing access denied")
         sound_to_play = os.path.join(self.sound_dir, "denied.mp3")
-        self._play_sound(sound_to_play)        
+        self.play_sound(sound_to_play)        
 
     def _find_sound_by_hash(self, sound_hash):
         if os.path.exists(self.custom_sound_dir):
@@ -47,9 +47,15 @@ class SoundPlayer:
                     return os.path.join(self.custom_sound_dir, file_name)
         return None
 
-    def _play_sound(self, path):
+    @classmethod
+    def play_sound(cls, path):
         try:
             pygame.mixer.music.load(path)
             pygame.mixer.music.play()
         except pygame.error as e:
             logger.error(f"Playing sound failed: path = '{path}', exception = '{e}")
+
+    @classmethod
+    def wait_until_done():
+        while pygame.mixer.music.get_busy() == True:
+            continue
