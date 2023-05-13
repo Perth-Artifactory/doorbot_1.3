@@ -5,6 +5,7 @@ RFID and NFC based access control system for the Perth Artifactory.
 Interfaces with Slack and other services for administration and logging.
 """
 
+import math
 import logging
 import json
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
@@ -68,8 +69,8 @@ key_reader = KeyReader(pigpio_pi)
 # Blinkstick - more LEDs!
 blink = BlinkstickInterface()
 
-# Flag to stop async unlock function running in parallel
-door_unlocked = False
+# Keep track of concurrent door unlocks with a countdown
+global_lock_countdown_seconds = 0
 
 # TidyAuth API Client
 tidyauth_client = TidyAuthClient(base_url=config.tidyauth_url, token=config.tidyauth_token)
@@ -84,7 +85,26 @@ sound_player = SoundPlayer(sound_dir=config.sounds_dir, custom_sound_dir=config.
 app = AsyncApp(token=config.SLACK_BOT_TOKEN)
 
 
-# ======= Helper Methods =======
+# ======= Door Unlocking Methods =======
+
+def gpio_unlock(time_s: float):
+    hat_gpio.set_relay(config.relay_channel, True)
+    global global_lock_countdown_seconds
+    if time_s > global_lock_countdown_seconds:
+        # Start or extend unlock time
+        global_lock_countdown_seconds = time_s
+        general_logger.info(f"gpio_unlock - Unlocked door and set countdown to {global_lock_countdown_seconds} s")
+    else:
+        general_logger.info(f"gpio_unlock - Door already unlocked for another {global_lock_countdown_seconds} s (requested: {time_s=} s)")
+
+
+
+def gpio_lock():
+    general_logger.info(f"gpio_lock - Locking door")
+    hat_gpio.set_relay(config.relay_channel, False)
+
+
+# ======= Slack Helper Methods =======
 
 def check_auth(b):
     """Check whether a user/channel is authorised to control doorbot via slack"""
@@ -141,21 +161,6 @@ async def update_admin_users(client):
     response = await client.usergroups_users_list(usergroup=usergroup_id)
     config.admin_users = response['users']
     general_logger.debug(f"update_admin_users - Admin users are: {', '.join(config.admin_users)}")
-
-
-async def gpio_unlock(time_s: float):
-    # Use "door_unlocked" like a lock/mutex to ensure this doesn't run in parallel
-    global door_unlocked
-    if not door_unlocked:
-        door_unlocked = True
-
-        hat_gpio.set_relay(config.relay_channel, True)
-        general_logger.info(f"gpio_unlock - DoorbotHatGpio UNLOCKED DOOR")
-        await asyncio.sleep(time_s)
-        hat_gpio.set_relay(config.relay_channel, False)
-        general_logger.info(f"gpio_unlock - DoorbotHatGpio LOCK DOOR")
-
-        door_unlocked = False
 
 
 # ======= Slack Handlers =======
@@ -218,6 +223,8 @@ async def handle_tts_message(ack, body, logger):
         logger.error(f"User not authorised for admin access. Allowed = '{config.admin_users}'.")
 
 
+
+
 @app.action("unlock")
 async def handle_unlock(ack, body, logger):
     await ack()
@@ -230,9 +237,10 @@ async def handle_unlock(ack, body, logger):
             logger.error("Invalid wait time: " + value)
         else:
             # Valid time
-            await post_slack_log(f"Admin '{get_user_name(body)}' manually opened door for {time_s:.1f} seconds")
-            logger.info(f"DOOR UNLOCK = {time_s:.1f} seconds")
-            await gpio_unlock(time_s)
+            msg = f"Admin '{get_user_name(body)}' manually opened door for {time_s:.1f} seconds"
+            await post_slack_log(msg)
+            logger.info(msg)
+            gpio_unlock(time_s)
     else:
         logger.error(f"User not authorised for admin access. Allowed = '{config.admin_users}'.")
 
@@ -252,28 +260,36 @@ async def read_tags():
 
             # Pad with zeros to 10 digits like API expects
             tag = f"{tag:0>10}"
+
             if user_manager.is_key_authorised(tag):
                 # Access granted
                 user = user_manager.get_user_details(tag)
                 name = user['name']
                 level = user['door']
+                groups = user['groups']
+
+                unlock_time = 5.0  # Default unlock time in seconds
+                if 'delayed' in groups:
+                    unlock_time = 30.0
+                gpio_unlock(unlock_time)
+
+                sound_player.play_access_granted_or_custom(user)
                 general_logger.info(f"read_tags - Access granted: tag = '{tag}', user = {str(user)}")
                 await app.client.chat_postMessage(
                     channel=config.channel,
                     **slack_blocks.door_access(
                         name=name, tag=tag, status=':white_check_mark: Door unlocked', level=level),
                 )
-                sound_player.play_access_granted_or_custom(user)
-                await gpio_unlock(5.0)
+
             else:
                 # Access denied
+                sound_player.play_denied()
                 general_logger.info(f"read_tags - Access denied: tag = '{tag}'")
                 await app.client.chat_postMessage(
                     channel=config.channel,
                     **slack_blocks.door_access(
                         name="Unknown", tag=tag, status=':x: Access denied', level="Unknown")
                 )
-                sound_player.play_denied()
 
         if len(key_reader.pending_errors) > 0:
             msg = key_reader.pending_errors.pop(0)
@@ -285,6 +301,24 @@ async def read_tags():
 
         await asyncio.sleep(0.1)
 
+async def relock_door():
+    """Worker coroutine to countdown to relocking door"""
+    while True:
+        global global_lock_countdown_seconds
+        if global_lock_countdown_seconds > 0:
+            general_logger.info(f"relock_door - start countdown: {global_lock_countdown_seconds=}")
+            while True:
+                await asyncio.sleep(1)
+                def is_close_to_zero(value):
+                    return math.isclose(value, 0.0, abs_tol=1e-9)
+                if is_close_to_zero(global_lock_countdown_seconds) or global_lock_countdown_seconds <= 0:
+                    gpio_lock()
+                    break
+                else:
+                    global_lock_countdown_seconds -= 1
+                general_logger.info(f"relock_door - counting down: {global_lock_countdown_seconds=}")
+
+        await asyncio.sleep(0.1)
 
 async def update_keys():
     """Worker coroutine to refresh keys from the API"""
@@ -321,6 +355,7 @@ async def download_sounds():
 async def run():
     general_logger.info("run - Starting up")
     asyncio.ensure_future(read_tags())
+    asyncio.ensure_future(relock_door())
     asyncio.ensure_future(update_keys())
     asyncio.ensure_future(download_sounds())
     handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
