@@ -1,3 +1,4 @@
+import asyncio
 import argparse
 from doorbot.interfaces.tidyauth_client import TidyAuthClient
 from doorbot.interfaces.user_manager import UserManager
@@ -21,17 +22,24 @@ token = args.token
 
 client = TidyAuthClient(base_url, token)
 
-user_manager = UserManager(api_client=client, cache_path=cache_path)
+async def main():
+    user_manager = UserManager(api_client=client, cache_path=cache_path)
 
-authed = user_manager.is_key_authorised(args.key_to_play)
-print(f"User is authed = {authed}")
+    print("Initial key loading")
+    keys_changed = await user_manager.download_keys()
+    print(f"{keys_changed=}")
 
-user = user_manager.get_user_details(args.key_to_play)
-print(f"User details = {user}")
+    authed = user_manager.is_key_authorised(args.key_to_play)
+    print(f"User is authed = {authed}")
 
-authed = user_manager.is_key_authorised("123")
-print(f"User is authed = {authed}")
+    user = user_manager.get_user_details(args.key_to_play)
+    print(f"User details = {user}")
 
-print("Updating keys")
-user_manager.download_keys()
+    authed = user_manager.is_key_authorised("123")
+    print(f"User is authed = {authed}")
 
+    print("Updating keys")
+    keys_changed = await user_manager.download_keys()
+    print(f"{keys_changed=}")
+
+asyncio.run(main())

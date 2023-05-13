@@ -23,7 +23,7 @@ from doorbot.interfaces.sound_player import SoundPlayer
 from doorbot.interfaces import text_to_speech
 
 logging.basicConfig(level=logging.DEBUG)
-general_logger = logging.getLogger()
+general_logger = logging.getLogger("app")
 
 # ======= Config =======
 
@@ -140,7 +140,7 @@ async def update_admin_users(client):
     # Update authorised users
     response = await client.usergroups_users_list(usergroup=usergroup_id)
     config.admin_users = response['users']
-    general_logger.debug(f"Admin users are: {', '.join(config.admin_users)}")
+    general_logger.debug(f"update_admin_users - Admin users are: {', '.join(config.admin_users)}")
 
 
 async def gpio_unlock(time_s: float):
@@ -150,10 +150,10 @@ async def gpio_unlock(time_s: float):
         door_unlocked = True
 
         hat_gpio.set_relay(config.relay_channel, True)
-        general_logger.info(f"DoorbotHatGpio UNLOCKED DOOR")
+        general_logger.info(f"gpio_unlock - DoorbotHatGpio UNLOCKED DOOR")
         await asyncio.sleep(time_s)
         hat_gpio.set_relay(config.relay_channel, False)
-        general_logger.info(f"DoorbotHatGpio LOCK DOOR")
+        general_logger.info(f"gpio_unlock - DoorbotHatGpio LOCK DOOR")
 
         door_unlocked = False
 
@@ -257,7 +257,7 @@ async def read_tags():
                 user = user_manager.get_user_details(tag)
                 name = user['name']
                 level = user['door']
-                general_logger.info(f"Access granted: tag = '{tag}', user = {str(user)}")
+                general_logger.info(f"read_tags - Access granted: tag = '{tag}', user = {str(user)}")
                 await app.client.chat_postMessage(
                     channel=config.channel,
                     **slack_blocks.door_access(
@@ -267,7 +267,7 @@ async def read_tags():
                 await gpio_unlock(5.0)
             else:
                 # Access denied
-                general_logger.info(f"Access denied: tag = '{tag}'")
+                general_logger.info(f"read_tags - Access denied: tag = '{tag}'")
                 await app.client.chat_postMessage(
                     channel=config.channel,
                     **slack_blocks.door_access(
@@ -277,7 +277,7 @@ async def read_tags():
 
         if len(key_reader.pending_errors) > 0:
             msg = key_reader.pending_errors.pop(0)
-            general_logger.info(f"Bad read: {msg}")
+            general_logger.info(f"read_tags - Bad read: {msg}")
             await app.client.chat_postMessage(
                 channel=config.channel,
                 text=f"Bad read: {msg}",
@@ -289,19 +289,23 @@ async def read_tags():
 async def update_keys():
     """Worker coroutine to refresh keys from the API"""
     while True:
-        # First update is done by construction of user_manager so first time 
-        # through loop, we wait
-        await asyncio.sleep(config.tidyauth_update_interval_seconds)
-        general_logger.debug("Update data from tidyauth")
-        changed = user_manager.download_keys()
+        # Update on startup
+        general_logger.debug("update_keys - Update data from tidyauth")
+        changed = await user_manager.download_keys()
         if changed:
+            general_logger.debug("update_keys - Keys changed")
+            await app.client.chat_postMessage(
+                channel=config.channel,
+                text="Keys updated (change received from TidyAPI)"
+            )
             await download_sounds()
+        await asyncio.sleep(config.tidyauth_update_interval_seconds)
 
 
 async def download_sounds():
     """Worker coroutine download sounds"""
     users = user_manager.get_users_with_custom_sounds()
-    general_logger.debug(f"Check if sounds need downloading for {len(users)} users")
+    general_logger.debug(f"download_sounds - Check if sounds need downloading for {len(users)} users")
     sound_downloader = SoundDownloader(
         users_with_custom_sounds=users, 
         download_directory=config.custom_sounds_dir)
@@ -315,7 +319,7 @@ async def download_sounds():
 # ======= Main =======
 
 async def run():
-    general_logger.info("Starting up")
+    general_logger.info("run - Starting up")
     asyncio.ensure_future(read_tags())
     asyncio.ensure_future(update_keys())
     asyncio.ensure_future(download_sounds())
