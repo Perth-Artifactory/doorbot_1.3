@@ -50,6 +50,7 @@ class SoundPlayer:
     @classmethod
     def play_sound(cls, path):
         try:
+            # TODO: Consider if python library "playsound" is a bit simpler
             pygame.mixer.music.load(path)
             pygame.mixer.music.play()
         except pygame.error as e:
