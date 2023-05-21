@@ -125,6 +125,15 @@ def get_user_name(b):
         return "Unknown"
 
 
+def get_response_text(b):
+    """Find the text action payload from dropdown"""
+    for block in b['actions']:
+        if 'selected_option' in block:
+            return block['selected_option']['text']['text']
+        else:
+            return block['text']['text']
+
+
 def get_response_value(b):
     """Find the value action payload from dropdown"""
     for block in b['actions']:
@@ -195,17 +204,10 @@ async def handle_send_message(ack, body, logger):
     await ack()
     logger.info("app.action 'sendMessage':" + str(body))
     if check_auth(body):
-        key = get_response_value(body)
-        logger.info(f"SEND MESSAGE = {key}")
-        await post_slack_log(f"Admin '{get_user_name(body)}' played message: {key}")
-        messages = {"key_disabled": "noticeDisabled",
-                    "volunteer_contact": "noticeContact",
-                    "covid": "noticeCOVID",
-                    "notice_you": "noticePresence"}
-        if key in messages:
-            text_to_speech.non_blocking_speak(messages[key])
-        else:
-            logger.error(f"{key} was not a valid predefined message")
+        text = get_response_text(body)
+        logger.info(f"SEND MESSAGE = {text}")
+        await post_slack_log(f"Admin '{get_user_name(body)}' played predefine TTS: {text}")
+        text_to_speech.non_blocking_speak(text)
     else:
         logger.error(f"User not authorised for admin access. Allowed = '{config.admin_users}'.")
 
