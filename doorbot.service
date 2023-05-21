@@ -1,14 +1,14 @@
 [Unit]
-Description=My Python Application
+Description=Doorbot
 After=network.target pigpio.service
 Wants=pigpio.service
 
 [Service]
 User=pi
 Group=pi
-WorkingDirectory=/path/to/my_python_app
-ExecStartPre=/bin/systemctl restart pigpio
-ExecStart=/bin/bash -c 'source .venv/bin/activate; python -u main.py'
+WorkingDirectory=/home/pi/doorbot_1.3
+ExecStartPre=sudo /bin/systemctl restart pigpiod
+ExecStart=/bin/bash -c 'source .venv/bin/activate; python -u -m doorbot'
 Restart=always
 RestartSec=3
 
