@@ -3,12 +3,6 @@ DoorBot 1.3 consisting of a Raspberry Pi 2 and custom made DoorBot v1.3 shield
 
 ## Installation
 
-Install this package (required for mp3s in `pygame`):
-```
-sudo apt-get install python3-pygame
-sudo apt-get install python3-sdl2
-```
-
 Install this package for TTS:
 ```
 sudo apt-get install espeak
@@ -28,6 +22,11 @@ Activate pigpiod:
 ```
 sudo systemctl enable pigpiod
 sudo systemctl start pigpiod
+```
+
+playsound requires gstreamer (activate venv before installing):
+```
+sudo apt-get install python3-gst-1.0 gstreamer1.0-plugins-good gstreamer1.0-plugins-ugly gstreamer1.0-tools
 ```
 
 ## Run

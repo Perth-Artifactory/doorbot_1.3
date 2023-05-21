@@ -7,8 +7,8 @@ from flask import Flask, request, jsonify
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from interfaces.text_to_speech import non_blocking_speak
-from interfaces.sound_player import SoundPlayer
+from doorbot.interfaces.text_to_speech import non_blocking_speak
+from doorbot.interfaces.sound_player import SoundPlayer
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
@@ -50,8 +50,7 @@ def webhook_play_mp3_base64():
         temp_mp3_path = temp_mp3.name
 
     def play_and_delete_mp3():
-        SoundPlayer.play_sound(temp_mp3_path)
-        SoundPlayer.wait_until_done()
+        SoundPlayer.play_sound(temp_mp3_path, wait_until_done=True)
         os.remove(temp_mp3_path)
 
     play_thread = threading.Thread(target=play_and_delete_mp3)

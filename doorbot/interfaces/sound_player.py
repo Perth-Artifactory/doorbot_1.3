@@ -2,7 +2,7 @@
 Play sounds for key access
 """
 
-import pygame
+import playsound
 import os
 import fnmatch
 import logging
@@ -13,7 +13,6 @@ class SoundPlayer:
     def __init__(self, sound_dir, custom_sound_dir):
         self.sound_dir = sound_dir
         self.custom_sound_dir = custom_sound_dir
-        pygame.mixer.init()
 
     def play_access_granted_or_custom(self, user):
         # Fallback option if no custom sound is simply "access granted"
@@ -48,15 +47,6 @@ class SoundPlayer:
         return None
 
     @classmethod
-    def play_sound(cls, path):
-        try:
-            # TODO: Consider if python library "playsound" is a bit simpler
-            pygame.mixer.music.load(path)
-            pygame.mixer.music.play()
-        except pygame.error as e:
-            logger.error(f"Playing sound failed: path = '{path}', exception = '{e}")
+    def play_sound(cls, path, wait_until_done=False):
+        playsound.playsound(path, wait_until_done)
 
-    @classmethod
-    def wait_until_done():
-        while pygame.mixer.music.get_busy() == True:
-            continue
