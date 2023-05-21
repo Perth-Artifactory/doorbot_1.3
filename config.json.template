@@ -3,6 +3,7 @@
     "SLACK_APP_TOKEN": "",
     "SLACK_BOT_TOKEN": "",
     "slack_channel": "#doorbot-slack-test",
+    "slack_channel_logs": "#doorbot-test-2",
     "admin_usergroup_handle": "doorbot-admins",
     "relay_channel": "R1",
     "tidyauth": {

@@ -6,7 +6,9 @@ Interfaces with Slack and other services for administration and logging.
 """
 
 import math
+import sys
 import logging
+from logging.handlers import RotatingFileHandler
 import json
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.app.async_app import AsyncApp
@@ -23,7 +25,50 @@ from doorbot.interfaces.sound_downloader import SoundDownloader
 from doorbot.interfaces.sound_player import SoundPlayer
 from doorbot.interfaces import text_to_speech
 
-logging.basicConfig(level=logging.DEBUG)
+global_slack_log_queue = []
+
+# Create a custom handler
+class MyCustomHandler(logging.Handler):
+    def emit(self, record):
+        log_entry = self.format(record)
+        global global_slack_log_queue
+        global_slack_log_queue.append(log_entry)
+        print(f"log queue {len(global_slack_log_queue)}, Appended: {log_entry=}")
+
+# Get the root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+
+# Create a file handler
+file_handler = RotatingFileHandler('doorbot.log', maxBytes=2000000, backupCount=5)
+file_handler.setLevel(logging.DEBUG)
+
+# Create a stream handler
+stream_handler = logging.StreamHandler(sys.stdout)
+stream_handler.setLevel(logging.DEBUG)
+
+# Create the custom handler
+custom_handler = MyCustomHandler()
+custom_handler.setLevel(logging.INFO)
+
+# Create a formatter
+formatter = logging.Formatter('%(asctime)s [%(levelname)s] {%(name)s} %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+# Add the formatter to the handlers
+file_handler.setFormatter(formatter)
+stream_handler.setFormatter(formatter)
+custom_handler.setFormatter(formatter)
+
+# Add the handlers to the root logger
+root_logger.addHandler(file_handler)
+root_logger.addHandler(stream_handler)
+root_logger.addHandler(custom_handler)
+
+# logging.basicConfig(
+#     level=logging.DEBUG,
+#     format='%(asctime)s [%(levelname)s] %(message)s',
+#     datefmt='%Y-%m-%d %H:%M:%S'
+# )
 general_logger = logging.getLogger("app")
 
 # ======= Config =======
@@ -39,6 +84,7 @@ class Config:
         self.SLACK_APP_TOKEN = config["SLACK_APP_TOKEN"]
         self.SLACK_BOT_TOKEN = config["SLACK_BOT_TOKEN"]
         self.channel = config["slack_channel"]
+        self.channel_logs = config["slack_channel_logs"]
         self.admin_usergroup_handle = config["admin_usergroup_handle"]
         self.relay_channel = config["relay_channel"]
         self.tidyauth_url = config["tidyauth"]["url"]
@@ -143,9 +189,16 @@ def get_response_value(b):
             return block['value']
 
 
-async def post_slack_log(message):
+async def post_slack_door(message):
     await app.client.chat_postMessage(
         channel=config.channel,
+        text=message,
+    )
+
+
+async def post_slack_log(message):
+    await app.client.chat_postMessage(
+        channel=config.channel_logs,
         text=message,
     )
 
@@ -202,11 +255,11 @@ async def update_home_tab(client, event, logger):
 @app.action("sendMessage")
 async def handle_send_message(ack, body, logger):
     await ack()
-    logger.info("app.action 'sendMessage':" + str(body))
+    logger.debug("app.action 'sendMessage':" + str(body))
     if check_auth(body):
         text = get_response_text(body)
         logger.info(f"SEND MESSAGE = {text}")
-        await post_slack_log(f"Admin '{get_user_name(body)}' played predefine TTS: {text}")
+        await post_slack_door(f"Admin '{get_user_name(body)}' played predefine TTS: {text}")
         text_to_speech.non_blocking_speak(text)
     else:
         logger.error(f"User not authorised for admin access. Allowed = '{config.admin_users}'.")
@@ -215,10 +268,10 @@ async def handle_send_message(ack, body, logger):
 @app.action("ttsMessage")
 async def handle_tts_message(ack, body, logger):
     await ack()
-    logger.info("app.action 'ttsMessage':" + str(body))
+    logger.debug("app.action 'ttsMessage':" + str(body))
     if check_auth(body):
         text = get_response_value(body)
-        await post_slack_log(f"Admin '{get_user_name(body)}' played TTS: {text}")
+        await post_slack_door(f"Admin '{get_user_name(body)}' played TTS: {text}")
         logger.info(f"TTS MESSAGE = {text}")
         text_to_speech.non_blocking_speak(text)
     else:
@@ -230,7 +283,7 @@ async def handle_tts_message(ack, body, logger):
 @app.action("unlock")
 async def handle_unlock(ack, body, logger):
     await ack()
-    logger.info("app.action 'unlock':" + str(body))
+    logger.debug("app.action 'unlock':" + str(body))
     if check_auth(body):
         value = get_response_value(body)
         try:
@@ -240,7 +293,7 @@ async def handle_unlock(ack, body, logger):
         else:
             # Valid time
             msg = f"Admin '{get_user_name(body)}' manually opened door for {time_s:.1f} seconds"
-            await post_slack_log(msg)
+            await post_slack_door(msg)
             logger.info(msg)
             gpio_unlock(time_s)
     else:
@@ -305,8 +358,8 @@ async def read_tags():
 
 async def relock_door():
     """Worker coroutine to countdown to relocking door"""
+    global global_lock_countdown_seconds
     while True:
-        global global_lock_countdown_seconds
         if global_lock_countdown_seconds > 0:
             general_logger.info(f"relock_door - start countdown: {global_lock_countdown_seconds=}")
             while True:
@@ -352,6 +405,16 @@ async def download_sounds():
         await asyncio.sleep(0.5)
 
 
+async def slack_logs_worker():
+    """Worker coroutine post logs to slack when required"""
+    global global_slack_log_queue
+    while True:
+        if len(global_slack_log_queue) > 0:
+            await post_slack_log(global_slack_log_queue.pop())
+            print(f"WORKER: log queue {len(global_slack_log_queue)}")
+        await asyncio.sleep(0.1)
+
+
 # ======= Main =======
 
 async def run():
@@ -360,6 +423,7 @@ async def run():
     asyncio.ensure_future(relock_door())
     asyncio.ensure_future(update_keys())
     asyncio.ensure_future(download_sounds())
+    asyncio.ensure_future(slack_logs_worker())
     handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
     await handler.start_async()
 
