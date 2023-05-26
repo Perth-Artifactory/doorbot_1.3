@@ -28,12 +28,11 @@ from doorbot.interfaces import text_to_speech
 global_slack_log_queue = []
 
 # Create a custom handler
-class MyCustomHandler(logging.Handler):
+class SlackLogger(logging.Handler):
     def emit(self, record):
         log_entry = self.format(record)
         global global_slack_log_queue
         global_slack_log_queue.append(log_entry)
-        print(f"log queue {len(global_slack_log_queue)}, Appended: {log_entry=}")
 
 # Get the root logger
 root_logger = logging.getLogger()
@@ -48,7 +47,7 @@ stream_handler = logging.StreamHandler(sys.stdout)
 stream_handler.setLevel(logging.DEBUG)
 
 # Create the custom handler
-custom_handler = MyCustomHandler()
+custom_handler = SlackLogger()
 custom_handler.setLevel(logging.INFO)
 
 # Create a formatter
@@ -310,49 +309,53 @@ async def read_tags():
     )
 
     while True:
-        if len(key_reader.pending_keys) > 0:
-            tag = key_reader.pending_keys.pop(0)
+        try:
+            if len(key_reader.pending_keys) > 0:
+                tag = key_reader.pending_keys.pop(0)
 
-            # Pad with zeros to 10 digits like API expects
-            tag = f"{tag:0>10}"
+                # Pad with zeros to 10 digits like API expects
+                tag = f"{tag:0>10}"
 
-            if user_manager.is_key_authorised(tag):
-                # Access granted
-                user = user_manager.get_user_details(tag)
-                name = user['name']
-                level = user['door']
-                groups = user['groups']
+                if user_manager.is_key_authorised(tag):
+                    # Access granted
+                    user = user_manager.get_user_details(tag)
+                    name = user['name']
+                    level = user['door']
+                    groups = user['groups']
 
-                unlock_time = 5.0  # Default unlock time in seconds
-                if 'delayed' in groups:
-                    unlock_time = 30.0
-                gpio_unlock(unlock_time)
+                    unlock_time = 5.0  # Default unlock time in seconds
+                    if 'delayed' in groups:
+                        unlock_time = 30.0
+                    gpio_unlock(unlock_time)
 
-                sound_player.play_access_granted_or_custom(user)
-                general_logger.info(f"read_tags - Access granted: tag = '{tag}', user = {str(user)}")
+                    sound_player.play_access_granted_or_custom(user)
+                    general_logger.info(f"read_tags - Access granted: tag = '{tag}', user = {str(user)}")
+                    await app.client.chat_postMessage(
+                        channel=config.channel,
+                        **slack_blocks.door_access(
+                            name=name, tag=tag, status=':white_check_mark: Door unlocked', level=level),
+                    )
+
+                else:
+                    # Access denied
+                    sound_player.play_denied()
+                    general_logger.info(f"read_tags - Access denied: tag = '{tag}'")
+                    await app.client.chat_postMessage(
+                        channel=config.channel,
+                        **slack_blocks.door_access(
+                            name="Unknown", tag=tag, status=':x: Access denied', level="Unknown")
+                    )
+
+            if len(key_reader.pending_errors) > 0:
+                msg = key_reader.pending_errors.pop(0)
+                general_logger.info(f"read_tags - Bad read: {msg}")
                 await app.client.chat_postMessage(
                     channel=config.channel,
-                    **slack_blocks.door_access(
-                        name=name, tag=tag, status=':white_check_mark: Door unlocked', level=level),
+                    text=f"Bad read: {msg}",
                 )
-
-            else:
-                # Access denied
-                sound_player.play_denied()
-                general_logger.info(f"read_tags - Access denied: tag = '{tag}'")
-                await app.client.chat_postMessage(
-                    channel=config.channel,
-                    **slack_blocks.door_access(
-                        name="Unknown", tag=tag, status=':x: Access denied', level="Unknown")
-                )
-
-        if len(key_reader.pending_errors) > 0:
-            msg = key_reader.pending_errors.pop(0)
-            general_logger.info(f"read_tags - Bad read: {msg}")
-            await app.client.chat_postMessage(
-                channel=config.channel,
-                text=f"Bad read: {msg}",
-            )
+        except Exception as e:
+            general_logger.error("read_tags - An unexpected exception occurred: {e}")
+            await asyncio.sleep(5)
 
         await asyncio.sleep(0.1)
 
@@ -360,34 +363,44 @@ async def relock_door():
     """Worker coroutine to countdown to relocking door"""
     global global_lock_countdown_seconds
     while True:
-        if global_lock_countdown_seconds > 0:
-            general_logger.info(f"relock_door - start countdown: {global_lock_countdown_seconds=}")
-            while True:
-                await asyncio.sleep(1)
-                def is_close_to_zero(value):
-                    return math.isclose(value, 0.0, abs_tol=1e-9)
-                if is_close_to_zero(global_lock_countdown_seconds) or global_lock_countdown_seconds <= 0:
-                    gpio_lock()
-                    break
-                else:
-                    global_lock_countdown_seconds -= 1
-                general_logger.info(f"relock_door - counting down: {global_lock_countdown_seconds=}")
+        try:
+            if global_lock_countdown_seconds > 0:
+                general_logger.info(f"relock_door - start countdown: {global_lock_countdown_seconds=}")
+                while True:
+                    await asyncio.sleep(1)
+                    def is_close_to_zero(value):
+                        return math.isclose(value, 0.0, abs_tol=1e-9)
+                    if is_close_to_zero(global_lock_countdown_seconds) or global_lock_countdown_seconds <= 0:
+                        gpio_lock()
+                        break
+                    else:
+                        global_lock_countdown_seconds -= 1
+                    general_logger.info(f"relock_door - counting down: {global_lock_countdown_seconds=}")
+        except Exception as e:
+            general_logger.error("relock_door - An unexpected exception occurred: {e}")
+            gpio_lock()
+            await asyncio.sleep(5)
 
         await asyncio.sleep(0.1)
 
 async def update_keys():
     """Worker coroutine to refresh keys from the API"""
     while True:
-        # Update on startup
-        general_logger.debug("update_keys - Update data from tidyauth")
-        changed = await user_manager.download_keys()
-        if changed:
-            general_logger.debug("update_keys - Keys changed")
-            await app.client.chat_postMessage(
-                channel=config.channel,
-                text="Keys updated (change received from TidyAPI)"
-            )
-            await download_sounds()
+        try:
+            # Update on startup
+            general_logger.debug("update_keys - Update data from tidyauth")
+            changed = await user_manager.download_keys()
+            if changed:
+                general_logger.debug("update_keys - Keys changed")
+                await app.client.chat_postMessage(
+                    channel=config.channel,
+                    text="Keys updated (change received from TidyAPI)"
+                )
+                await download_sounds()
+        except Exception as e:
+            general_logger.error("update_keys - An unexpected exception occurred: {e}")
+            await asyncio.sleep(5)
+
         await asyncio.sleep(config.tidyauth_update_interval_seconds)
 
 
@@ -409,9 +422,12 @@ async def slack_logs_worker():
     """Worker coroutine post logs to slack when required"""
     global global_slack_log_queue
     while True:
-        if len(global_slack_log_queue) > 0:
-            await post_slack_log(global_slack_log_queue.pop())
-            print(f"WORKER: log queue {len(global_slack_log_queue)}")
+        try:
+            if len(global_slack_log_queue) > 0:
+                await post_slack_log(global_slack_log_queue.pop())
+        except Exception as e:
+            general_logger.error("slack_logs_worker - An unexpected exception occurred: {e}")
+            await asyncio.sleep(5)
         await asyncio.sleep(0.1)
 
 
