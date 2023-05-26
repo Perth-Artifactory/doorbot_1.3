@@ -1,5 +1,5 @@
 """
-Interface with Doorbot 1.3 hat digital inputs and ouput (GPIO).
+Interface with Doorbot 1.3 hat digital inputs and output (GPIO).
 Control Relays and read from switches.
 
 Author: Tazard, 2022
@@ -8,6 +8,9 @@ Compatibility: Python3
 
 import time
 import pigpio
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Input switch debounce time
 DEBOUNCE_WAIT_S = 0.1
@@ -139,7 +142,7 @@ class DoorbotHatGpio:
         time.sleep(1)
 
     def log(self, message: str):
-        print("[DoorbotHatInterface] {}".format(message))
+        logger.debug("[DoorbotHatGpio] {}".format(message))
 
     def setup_switches(self, id, pin):
         # Set pin direction
