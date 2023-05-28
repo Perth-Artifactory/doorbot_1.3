@@ -14,6 +14,8 @@ from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.app.async_app import AsyncApp
 import asyncio
 import pigpio
+import re
+import os
 
 from doorbot.interfaces import slack_blocks
 from doorbot.interfaces.doorbot_hat_gpio import DoorbotHatGpio
@@ -25,50 +27,58 @@ from doorbot.interfaces.sound_downloader import SoundDownloader
 from doorbot.interfaces.sound_player import SoundPlayer
 from doorbot.interfaces import text_to_speech
 
+# ======= Logging =======
+
+# Global queue for log messages to be sent via Slack
 global_slack_log_queue = []
 
-# Create a custom handler
+# Holds the config but not used directly
+root_logger = None
+
+# General logging not covered by bolt in this file. Logs as "app".
+general_logger = None
+
 class SlackLogger(logging.Handler):
+    """Custom log handler to queue messages to be sent to a slack channel"""
     def emit(self, record):
-        log_entry = self.format(record)
+        log_msg = self.format(record)
+        sanitised_log_msg = re.sub(r"(?<=token=)[^&]*", "REDACTED", log_msg)
         global global_slack_log_queue
-        global_slack_log_queue.append(log_entry)
+        global_slack_log_queue.append(sanitised_log_msg)
 
-# Get the root logger
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG)
+def setup_logging(log_path):
+    """Setup all the handlers and formatters for logging"""
+    global root_logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
 
-# Create a file handler
-file_handler = RotatingFileHandler('doorbot.log', maxBytes=2000000, backupCount=5)
-file_handler.setLevel(logging.DEBUG)
+    # Writing to file
+    file_handler = RotatingFileHandler(log_path, maxBytes=2000000, backupCount=5)
+    file_handler.setLevel(logging.DEBUG)
 
-# Create a stream handler
-stream_handler = logging.StreamHandler(sys.stdout)
-stream_handler.setLevel(logging.DEBUG)
+    # Logging to stdout
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(logging.DEBUG)
 
-# Create the custom handler
-custom_handler = SlackLogger()
-custom_handler.setLevel(logging.INFO)
+    # Logging to a slack channel
+    custom_handler = SlackLogger()
+    custom_handler.setLevel(logging.INFO)
 
-# Create a formatter
-formatter = logging.Formatter('%(asctime)s [%(levelname)s] {%(name)s} %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    # Create a formatter
+    formatter = logging.Formatter('%(asctime)s [%(levelname)s] {%(name)s} %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-# Add the formatter to the handlers
-file_handler.setFormatter(formatter)
-stream_handler.setFormatter(formatter)
-custom_handler.setFormatter(formatter)
+    # Add the formatter to the handlers
+    file_handler.setFormatter(formatter)
+    stream_handler.setFormatter(formatter)
+    custom_handler.setFormatter(formatter)
 
-# Add the handlers to the root logger
-root_logger.addHandler(file_handler)
-root_logger.addHandler(stream_handler)
-root_logger.addHandler(custom_handler)
+    # Add the handlers to the root logger
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(stream_handler)
+    root_logger.addHandler(custom_handler)
 
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format='%(asctime)s [%(levelname)s] %(message)s',
-#     datefmt='%Y-%m-%d %H:%M:%S'
-# )
-general_logger = logging.getLogger("app")
+    global general_logger
+    general_logger = logging.getLogger("app")
 
 # ======= Config =======
 
@@ -92,6 +102,7 @@ class Config:
         self.tidyauth_update_interval_seconds = config["tidyauth"]["update_interval_seconds"]
         self.sounds_dir = config["sounds_dir"]
         self.custom_sounds_dir = config["custom_sounds_dir"]
+        self.log_path = config["log_path"]
 
         self.admin_users = []
 
@@ -101,6 +112,9 @@ config = Config()
 
 
 # ======= Setup =======
+
+# Setup all the logging
+setup_logging(config.log_path)
 
 # App should only create this once
 pigpio_pi = pigpio.pi()
@@ -250,7 +264,6 @@ async def update_home_tab(client, event, logger):
     except Exception as e:
         logger.error(f"Error publishing home tab: {e}")
 
-
 @app.action("sendMessage")
 async def handle_send_message(ack, body, logger):
     await ack()
@@ -261,8 +274,7 @@ async def handle_send_message(ack, body, logger):
         await post_slack_door(f"Admin '{get_user_name(body)}' played predefine TTS: {text}")
         text_to_speech.non_blocking_speak(text)
     else:
-        logger.error(f"User not authorised for admin access. Allowed = '{config.admin_users}'.")
-
+        logger.error(f"handle_send_message - User not authorised for admin access. Allowed = '{config.admin_users}'.")
 
 @app.action("ttsMessage")
 async def handle_tts_message(ack, body, logger):
@@ -274,10 +286,7 @@ async def handle_tts_message(ack, body, logger):
         logger.info(f"TTS MESSAGE = {text}")
         text_to_speech.non_blocking_speak(text)
     else:
-        logger.error(f"User not authorised for admin access. Allowed = '{config.admin_users}'.")
-
-
-
+        logger.error(f"handle_tts_message - User not authorised for admin access. Allowed = '{config.admin_users}'.")
 
 @app.action("unlock")
 async def handle_unlock(ack, body, logger):
@@ -296,8 +305,45 @@ async def handle_unlock(ack, body, logger):
             logger.info(msg)
             gpio_unlock(time_s)
     else:
-        logger.error(f"User not authorised for admin access. Allowed = '{config.admin_users}'.")
+        logger.error(f"handle_unlock - User not authorised for admin access. Allowed = '{config.admin_users}'.")
 
+@app.action("restartApp")
+async def handle_restart_app(ack, body, logger):
+    # Acknowledge the action
+    await ack()
+    logger.debug("app.action 'handle_restart_app':" + str(body))
+    if check_auth(body):
+        # Logs about restart
+        msg = f"Admin '{get_user_name(body)}' has asked the app to restart"
+        await post_slack_door(msg)
+        logger.warning(msg)
+
+        # Give log messages a chance to flush out
+        await asyncio.sleep(1)
+
+        # Restart the app by exiting and letting systemd restart us
+        sys.exit()
+    else:
+        logger.error(f"handle_restart_app - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+
+@app.action("rebootPi")
+async def handle_reboot_pi(ack, body, logger):
+    # Acknowledge the action
+    await ack()
+    logger.debug("app.action 'handle_restart_app':" + str(body))
+    if check_auth(body):
+        # Logs about restart
+        msg = f"Admin '{get_user_name(body)}' has asked the app to restart"
+        await post_slack_door(msg)
+        logger.warning(msg)
+
+        # Give log messages a chance to flush out
+        await asyncio.sleep(1)
+
+        # Reboot the Raspberry Pi
+        os.system('sudo reboot')
+    else:
+        logger.error(f"handle_reboot_pi - User not authorised for admin access. Allowed = '{config.admin_users}'.")
 
 # ======= Background Tasks =======
 
@@ -391,7 +437,7 @@ async def update_keys():
             general_logger.debug("update_keys - Update data from tidyauth")
             changed = await user_manager.download_keys()
             if changed:
-                general_logger.debug("update_keys - Keys changed")
+                general_logger.info("update_keys - Keys changed")
                 await app.client.chat_postMessage(
                     channel=config.channel,
                     text="Keys updated (change received from TidyAPI)"
@@ -402,7 +448,6 @@ async def update_keys():
             await asyncio.sleep(5)
 
         await asyncio.sleep(config.tidyauth_update_interval_seconds)
-
 
 async def download_sounds():
     """Worker coroutine download sounds"""
@@ -417,7 +462,6 @@ async def download_sounds():
         # Allow other things to run between sound file downloads
         await asyncio.sleep(0.5)
 
-
 async def slack_logs_worker():
     """Worker coroutine post logs to slack when required"""
     global global_slack_log_queue
@@ -429,7 +473,6 @@ async def slack_logs_worker():
             general_logger.error("slack_logs_worker - An unexpected exception occurred: {e}")
             await asyncio.sleep(5)
         await asyncio.sleep(0.1)
-
 
 # ======= Main =======
 

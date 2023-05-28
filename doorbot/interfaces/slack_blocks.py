@@ -98,6 +98,75 @@ home_view = {
                 "value": "30",
                 "action_id": "unlock"
             }
+        },
+        
+        # Add a divider
+        {
+            "type": "divider"
+        },
+        
+        # Add buttons for Restarting App and Rebooting Raspberry Pi
+        {
+            "type": "actions",
+            "elements":
+            [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Restart App",
+                        "emoji": True
+                    },
+                    "value": "restart_app",
+                    "action_id": "restartApp",
+                    "confirm": {
+                        "title": {
+                            "type": "plain_text",
+                            "text": "Are you sure?"
+                        },
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "This will restart the app. Are you sure you want to continue?"
+                        },
+                        "confirm": {
+                            "type": "plain_text",
+                            "text": "Yes"
+                        },
+                        "deny": {
+                            "type": "plain_text",
+                            "text": "No"
+                        }
+                    }
+                },
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Reboot Raspberry Pi",
+                        "emoji": True
+                    },
+                    "value": "reboot_pi",
+                    "action_id": "rebootPi",
+                    "confirm": {
+                        "title": {
+                            "type": "plain_text",
+                            "text": "Are you sure?"
+                        },
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "This will reboot the Raspberry Pi. Are you sure you want to continue?"
+                        },
+                        "confirm": {
+                            "type": "plain_text",
+                            "text": "Yes"
+                        },
+                        "deny": {
+                            "type": "plain_text",
+                            "text": "No"
+                        }
+                    }
+                }
+            ]
         }
     ]
 }

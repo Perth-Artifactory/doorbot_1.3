@@ -13,5 +13,6 @@
         "update_interval_seconds": 60.0
     },
     "sounds_dir": "sounds",
-    "custom_sounds_dir": "sounds/custom"
+    "custom_sounds_dir": "sounds/custom",
+    "log_path": "doorbot.log"
 }
