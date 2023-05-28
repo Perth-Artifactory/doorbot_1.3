@@ -5,7 +5,7 @@ sounds/custom
 *.csv
 config.json
 user_cache.json
-*.log
+*.log*
 
 # ____ Generic Python ignores _____
 # Byte-compiled / optimized / DLL files
