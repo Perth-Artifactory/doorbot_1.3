@@ -314,7 +314,7 @@ async def handle_restart_app(ack, body, logger):
     logger.debug("app.action 'handle_restart_app':" + str(body))
     if check_auth(body):
         # Logs about restart
-        msg = f"Admin '{get_user_name(body)}' has asked the app to restart"
+        msg = f"Admin '{get_user_name(body)}' has asked the doorbot app to restart"
         await post_slack_door(msg)
         logger.warning(msg)
 
@@ -333,7 +333,7 @@ async def handle_reboot_pi(ack, body, logger):
     logger.debug("app.action 'handle_restart_app':" + str(body))
     if check_auth(body):
         # Logs about restart
-        msg = f"Admin '{get_user_name(body)}' has asked the app to restart"
+        msg = f"Admin '{get_user_name(body)}' has asked the raspberry pi to reboot"
         await post_slack_door(msg)
         logger.warning(msg)
 
@@ -376,11 +376,14 @@ async def read_tags():
 
                     sound_player.play_access_granted_or_custom(user)
                     general_logger.info(f"read_tags - Access granted: tag = '{tag}', user = {str(user)}")
-                    await app.client.chat_postMessage(
+                    response = await app.client.chat_postMessage(
                         channel=config.channel,
                         **slack_blocks.door_access(
                             name=name, tag=tag, status=':white_check_mark: Door unlocked', level=level),
                     )
+
+                    ts = response['ts']
+                    general_logger.debug(f"read_tags - chat ts = {ts}")
 
                 else:
                     # Access denied
