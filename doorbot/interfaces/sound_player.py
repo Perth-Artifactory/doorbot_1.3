@@ -2,10 +2,11 @@
 Play sounds for key access
 """
 
-import playsound
 import os
 import fnmatch
 import logging
+import time
+import vlc
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ class SoundPlayer:
     def __init__(self, sound_dir, custom_sound_dir):
         self.sound_dir = sound_dir
         self.custom_sound_dir = custom_sound_dir
+        self.player = None
 
     def play_access_granted_or_custom(self, user):
         # Fallback option if no custom sound is simply "access granted"
@@ -46,7 +48,18 @@ class SoundPlayer:
                     return os.path.join(self.custom_sound_dir, file_name)
         return None
 
-    @classmethod
-    def play_sound(cls, path, wait_until_done=False):
-        playsound.playsound(path, wait_until_done)
+    def is_playing(self):
+        return self.player is not None and self.player.is_playing()
+            
+    def play_sound(self, path):
+        if self.is_playing():
+            logger.debug("Stopping existing sound")
+            self.player.stop()
+        if os.path.exists(path):
+            logger.debug(f"Play {path}")
+            self.player = vlc.MediaPlayer(path)
+            self.player.play()
+        else:
+            logger.error(f"Sound does not exist: {path}")
+
 

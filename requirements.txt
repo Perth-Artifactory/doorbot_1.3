@@ -7,5 +7,4 @@ pyusb
 pyttsx3
 flask
 flask_httpauth
-playsound
-pygobject  # For playsound
+python-vlc
