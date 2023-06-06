@@ -50,16 +50,27 @@ class SoundPlayer:
 
     def is_playing(self):
         return self.player is not None and self.player.is_playing()
-            
+
+    def wait_until_done(self):
+        if self.player is not None:
+            while True:
+                # Wait before so we give libvlc a chance to start. If you poll too quickly, 
+                # it won't yet be playing.
+                time.sleep(1)
+                if not self.is_playing():
+                    time.sleep(1)
+                    break
+
     def play_sound(self, path):
-        if self.is_playing():
-            logger.debug("Stopping existing sound")
+        if self.player is not None:
+            # Its important to always stop because is_playing isn't necessarily up to date
+            # and playing multiple media files are once breaks libvlc.
             self.player.stop()
         if os.path.exists(path):
             logger.debug(f"Play {path}")
             self.player = vlc.MediaPlayer(path)
             self.player.play()
         else:
-            logger.error(f"Sound does not exist: {path}")
+            logger.error(f"Sound does not exist: '{path}'")
 
 

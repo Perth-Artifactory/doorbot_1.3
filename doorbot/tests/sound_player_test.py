@@ -18,27 +18,18 @@ user_manager = UserManager(client, "user_cache.json.example")
 # Initialize the SoundPlayer with the sound directory
 sound_player = SoundPlayer(sound_directory, custom_sound_dir)
 
-def wait_until_done():
-    print("Waiting")
-    while True:
-        time.sleep(1)
-        if not sound_player.player.is_playing():
-            time.sleep(1)
-            break
-        print("Looping")
-        
-
 
 print()
 print("Play the sound for a given key")
+sound_player.play_access_granted_or_custom({"name": "Test user, no sound"})
+time.sleep(2)
 sound_player.play_access_granted_or_custom(user_manager.get_user_details("0123456789"))
 time.sleep(0.5)
 print("Interrupt the previous")
 sound_player.play_access_granted_or_custom(user_manager.get_user_details("0123456789"))
-time.sleep(5)
-
+time.sleep(4)
 sound_player.play_access_granted_or_custom({"name": "Test user, no sound"})
-time.sleep(5)
+time.sleep(3)
 
 sound_player.play_denied()
 time.sleep(1)
@@ -62,12 +53,13 @@ time.sleep(1)
 sound_player.play_access_granted_or_custom(user_manager.get_user_details("0123456789"))
 time.sleep(1)
 
+
 print()
 print("Play and wait")
-sound_player.play_sound(sound_directory + '/granted.mp3')
-wait_until_done()
+length = sound_player.play_sound(sound_directory + '/granted.mp3')
+sound_player.wait_until_done()
 sound_player.play_sound(sound_directory + '/denied.mp3')
-wait_until_done()
+sound_player.wait_until_done()
 sound_player.play_sound(sound_directory + '/granted.mp3')
-wait_until_done()
+sound_player.wait_until_done()
 
