@@ -20,7 +20,8 @@ def old_door_pi_hex_str_to_rfid(hex_str: str) -> int:
     # appear in the hex conversion of the decimal value written
     # on keyfobs and output from USB RFID reader.
     hex_str = hex_str[4:]
-    return int(hex_str, 16)
+    tag = int(hex_str, 16)
+    return f"{tag:0>10}"
 
 def convert(path, out):
     with open(path) as f:
