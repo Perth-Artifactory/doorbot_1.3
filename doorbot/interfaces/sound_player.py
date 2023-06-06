@@ -11,7 +11,7 @@ import vlc
 logger = logging.getLogger(__name__)
 
 class SoundPlayer:
-    def __init__(self, sound_dir, custom_sound_dir):
+    def __init__(self, sound_dir="", custom_sound_dir=""):
         self.sound_dir = sound_dir
         self.custom_sound_dir = custom_sound_dir
         self.player = None

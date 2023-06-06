@@ -12,6 +12,7 @@ from doorbot.interfaces.sound_player import SoundPlayer
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
+sound_player = SoundPlayer()        
 
 # Replace 'user' and 'password' with your desired credentials
 users = {
@@ -50,7 +51,8 @@ def webhook_play_mp3_base64():
         temp_mp3_path = temp_mp3.name
 
     def play_and_delete_mp3():
-        SoundPlayer.play_sound(temp_mp3_path, wait_until_done=True)
+        sound_player.play_sound(temp_mp3_path)
+        sound_player.wait_until_done()
         os.remove(temp_mp3_path)
 
     play_thread = threading.Thread(target=play_and_delete_mp3)

@@ -33,3 +33,9 @@ if __name__ == "__main__":
 
     # Call the /play_mp3_base64 endpoint
     print(call_play_mp3_base64("sounds/denied.mp3"))
+
+    # Call the /play_mp3_base64 endpoint
+    print(call_play_mp3_base64("sounds/granted.mp3"))
+
+    # Call the /play_mp3_base64 endpoint
+    print(call_play_mp3_base64("sounds/granted.mp3"))
