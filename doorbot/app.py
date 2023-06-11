@@ -403,7 +403,7 @@ async def read_tags():
                     text=f"Bad read: {msg}",
                 )
         except Exception as e:
-            general_logger.error("read_tags - An unexpected exception occurred: {e}")
+            general_logger.error(f"read_tags - An unexpected exception occurred: {e}")
             await asyncio.sleep(5)
 
         await asyncio.sleep(0.1)
@@ -426,7 +426,7 @@ async def relock_door():
                         global_lock_countdown_seconds -= 1
                     general_logger.debug(f"relock_door - counting down: {global_lock_countdown_seconds=}")
         except Exception as e:
-            general_logger.error("relock_door - An unexpected exception occurred: {e}")
+            general_logger.error(f"relock_door - An unexpected exception occurred: {e}")
             gpio_lock()
             await asyncio.sleep(5)
 
@@ -447,7 +447,7 @@ async def update_keys():
                 )
                 await download_sounds()
         except Exception as e:
-            general_logger.error("update_keys - An unexpected exception occurred: {e}")
+            general_logger.error(f"update_keys - An unexpected exception occurred: {e}")
             await asyncio.sleep(5)
 
         await asyncio.sleep(config.tidyauth_update_interval_seconds)
@@ -473,7 +473,7 @@ async def slack_logs_worker():
             if len(global_slack_log_queue) > 0:
                 await post_slack_log(global_slack_log_queue.pop())
         except Exception as e:
-            general_logger.error("slack_logs_worker - An unexpected exception occurred: {e}")
+            general_logger.error(f"slack_logs_worker - An unexpected exception occurred: {e}")
             await asyncio.sleep(5)
         await asyncio.sleep(0.1)
 
