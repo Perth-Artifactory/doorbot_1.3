@@ -152,7 +152,7 @@ def gpio_unlock(time_s: float):
     if time_s > global_lock_countdown_seconds:
         # Start or extend unlock time
         global_lock_countdown_seconds = time_s
-        general_logger.info(f"gpio_unlock - Unlocked door and set countdown to {global_lock_countdown_seconds} s")
+        general_logger.info(f"gpio_unlock - Unlock door for {global_lock_countdown_seconds} s")
     else:
         general_logger.info(f"gpio_unlock - Door already unlocked for another {global_lock_countdown_seconds} s (requested: {time_s=} s)")
 
@@ -414,7 +414,7 @@ async def relock_door():
     while True:
         try:
             if global_lock_countdown_seconds > 0:
-                general_logger.info(f"relock_door - start countdown: {global_lock_countdown_seconds=}")
+                general_logger.debug(f"relock_door - start countdown: {global_lock_countdown_seconds=}")
                 while True:
                     await asyncio.sleep(1)
                     def is_close_to_zero(value):
@@ -424,7 +424,7 @@ async def relock_door():
                         break
                     else:
                         global_lock_countdown_seconds -= 1
-                    general_logger.info(f"relock_door - counting down: {global_lock_countdown_seconds=}")
+                    general_logger.debug(f"relock_door - counting down: {global_lock_countdown_seconds=}")
         except Exception as e:
             general_logger.error("relock_door - An unexpected exception occurred: {e}")
             gpio_lock()
