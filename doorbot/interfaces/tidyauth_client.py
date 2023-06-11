@@ -56,7 +56,7 @@ class TidyAuthClient:
             logger.error(f"get_door_keys - Unexpected error: {e}")
         return None
 
-    async def zc(self, tidyhq_id):
+    async def get_sound_data(self, tidyhq_id):
         params = {"token": self.token, "tidyhq_id": tidyhq_id}
         try:
             async with ClientSession() as session:
@@ -69,9 +69,9 @@ class TidyAuthClient:
         except ValueError as e:
             logger.error(f"get_sound_data - JSONDecodeError: {e}")
         except ClientConnectionError as e:
-            logger.error(f"get_door_keys - ClientConnectionError: Could not connect to server: {e}")
+            logger.error(f"get_sound_data - ClientConnectionError: Could not connect to server: {e}")
         except TimeoutError as e:
-            logger.error(f"get_door_keys - TimeoutError: {e}")
+            logger.error(f"get_sound_data - TimeoutError: {e}")
         except Exception as e:
-            logger.error(f"get_door_keys - Unexpected error: {e}")
+            logger.error(f"get_sound_data - Unexpected error: {e}")
         return None
