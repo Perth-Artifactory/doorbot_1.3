@@ -16,10 +16,10 @@ def old_door_pi_hex_str_to_rfid(hex_str: str) -> int:
     decimal string printed on keyfobs and also what USB RFID 
     receiver outputs.
     """
-    # Chop off the first 4 hex chars (2 bytes). These two dont
+    # Chop off the first 1 hex chars (1 bytes). They don't
     # appear in the hex conversion of the decimal value written
     # on keyfobs and output from USB RFID reader.
-    hex_str = hex_str[4:]
+    hex_str = hex_str[2:]
     tag = int(hex_str, 16)
     return f"{tag:0>10}"
 
