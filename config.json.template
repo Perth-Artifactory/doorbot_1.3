@@ -9,10 +9,10 @@
     "tidyauth": {
         "url": "http://enclave:5000",
         "token": "",
-        "cache_file": "user_cache.json",
+        "cache_file": "/mnt/usbdrive/doorbot-data/user_cache.json",
         "update_interval_seconds": 60.0
     },
     "sounds_dir": "sounds",
-    "custom_sounds_dir": "sounds/custom",
-    "log_path": "doorbot.log"
+    "custom_sounds_dir": "/mnt/usbdrive/doorbot-data/custom_sounds",
+    "log_path": "/mnt/usbdrive/doorbot-data/doorbot.log"
 }

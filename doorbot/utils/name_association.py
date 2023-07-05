@@ -112,4 +112,7 @@ def name_associations(tidyhq, legacy, output_file):
     print(f'Number of Legacy names without match: {len(legacy_without_match)}')
 
 # usage
-name_associations('user_cache.json', 'legacy-converted.json', 'associations.json')
+name_associations(
+    '/mnt/usbdrive/doorbot-data/user_cache.json', 
+    '/mnt/usbdrive/doorbot-data/legacy-converted.json', 
+    '/mnt/usbdrive/doorbot-data/associations.json')

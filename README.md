@@ -13,15 +13,28 @@ Create virtual environment
 python3 -m venv .venv
 ```
 
+Activate the python virtual environment:
+```
+source .venv/bin/activate
+```
+
 Install requirements:
 ```
 pip install -r requirements.txt
 ```
 
-playsound requires gstreamer (activate venv before installing):
+Copy config template
 ```
-sudo apt-get install python3-gst-1.0 gstreamer1.0-plugins-good gstreamer1.0-plugins-ugly gstreamer1.0-tools
+cp config.json.template config.json
 ```
+
+Fill config:
+- TidyAuth token: See Fletcher.
+- Slack tokens: Create a new bot and generate the tokens. Bots cannot be transferred and there isn't really any downside to creating a new one. You need to give it the appropriate permissions (TODO - list them). You need to add the bot to channels you want it to interact with.
+- Update slack channels for user tracking and app logging.
+
+Permanently mount a USB drive
+
 
 Copy service files in and load them:
 ```
@@ -30,17 +43,9 @@ sudo cp doorbot.service /etc/systemd/system
 sudo systemctl daemon-reload
 ```
 
-## Run
+Reboot the pi and your app is now live
 
-Run this in commandline to activate the python virtual environment:
-```
-source .venv/bin/activate
-```
-
-Run the app for development
-```
-python -m doorbot
-```
+## During Operation
 
 The app will run as a service `doorbot`. The usual systemctl commands apply:
 ```
@@ -56,4 +61,17 @@ journalctl -xe -u doorbot -f
 ```
 
 Logs also go to file `doorbot.log` and to Slack (INFO and above).
+
+## Development
+
+Run this in commandline to activate the python virtual environment:
+```
+source .venv/bin/activate
+```
+
+Run the app for development
+```
+python -m doorbot
+```
+
 
