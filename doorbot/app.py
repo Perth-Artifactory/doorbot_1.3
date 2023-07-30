@@ -16,6 +16,7 @@ import asyncio
 import pigpio
 import re
 import os
+import requests
 
 from doorbot.interfaces import slack_blocks
 from doorbot.interfaces.doorbot_hat_gpio import DoorbotHatGpio
@@ -38,13 +39,16 @@ root_logger = None
 # General logging not covered by bolt in this file. Logs as "app".
 general_logger = None
 
+
 class SlackLogger(logging.Handler):
     """Custom log handler to queue messages to be sent to a slack channel"""
+
     def emit(self, record):
         log_msg = self.format(record)
         sanitised_log_msg = re.sub(r"(?<=token=)[^&]*", "REDACTED", log_msg)
         global global_slack_log_queue
         global_slack_log_queue.append(sanitised_log_msg)
+
 
 def setup_logging(log_path):
     """Setup all the handlers and formatters for logging"""
@@ -53,7 +57,8 @@ def setup_logging(log_path):
     root_logger.setLevel(logging.DEBUG)
 
     # Writing to file
-    file_handler = RotatingFileHandler(log_path, maxBytes=2000000, backupCount=5)
+    file_handler = RotatingFileHandler(
+        log_path, maxBytes=2000000, backupCount=5)
     file_handler.setLevel(logging.DEBUG)
 
     # Logging to stdout
@@ -65,7 +70,8 @@ def setup_logging(log_path):
     custom_handler.setLevel(logging.INFO)
 
     # Create a formatter
-    formatter = logging.Formatter('%(asctime)s [%(levelname)s] {%(name)s} %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] {%(name)s} %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
     # Add the formatter to the handlers
     file_handler.setFormatter(formatter)
@@ -81,6 +87,7 @@ def setup_logging(log_path):
     general_logger = logging.getLogger("app")
 
 # ======= Config =======
+
 
 class Config:
     """Config loader"""
@@ -103,6 +110,7 @@ class Config:
         self.sounds_dir = config["sounds_dir"]
         self.custom_sounds_dir = config["custom_sounds_dir"]
         self.log_path = config["log_path"]
+        self.access_granted_webhook = config["access_granted_webhook"]
 
         self.admin_users = []
 
@@ -132,13 +140,16 @@ blink = BlinkstickInterface()
 global_lock_countdown_seconds = 0
 
 # TidyAuth API Client
-tidyauth_client = TidyAuthClient(base_url=config.tidyauth_url, token=config.tidyauth_token)
+tidyauth_client = TidyAuthClient(
+    base_url=config.tidyauth_url, token=config.tidyauth_token)
 
 # User manager, using tidyauth API
-user_manager = UserManager(api_client=tidyauth_client, cache_path=config.tidyauth_cache_file)
+user_manager = UserManager(api_client=tidyauth_client,
+                           cache_path=config.tidyauth_cache_file)
 
 # Sound player
-sound_player = SoundPlayer(sound_dir=config.sounds_dir, custom_sound_dir=config.custom_sounds_dir)
+sound_player = SoundPlayer(sound_dir=config.sounds_dir,
+                           custom_sound_dir=config.custom_sounds_dir)
 
 # Load the slack bolt app framework
 app = AsyncApp(token=config.SLACK_BOT_TOKEN)
@@ -152,10 +163,11 @@ def gpio_unlock(time_s: float):
     if time_s > global_lock_countdown_seconds:
         # Start or extend unlock time
         global_lock_countdown_seconds = time_s
-        general_logger.info(f"gpio_unlock - Unlock door for {global_lock_countdown_seconds} s")
+        general_logger.info(
+            f"gpio_unlock - Unlock door for {global_lock_countdown_seconds} s")
     else:
-        general_logger.info(f"gpio_unlock - Door already unlocked for another {global_lock_countdown_seconds} s (requested: {time_s=} s)")
-
+        general_logger.info(
+            f"gpio_unlock - Door already unlocked for another {global_lock_countdown_seconds} s (requested: {time_s=} s)")
 
 
 def gpio_lock():
@@ -235,7 +247,8 @@ async def update_admin_users(client):
     # Update authorised users
     response = await client.usergroups_users_list(usergroup=usergroup_id)
     config.admin_users = response['users']
-    general_logger.debug(f"update_admin_users - Admin users are: {', '.join(config.admin_users)}")
+    general_logger.debug(
+        f"update_admin_users - Admin users are: {', '.join(config.admin_users)}")
 
 
 # ======= Slack Handlers =======
@@ -264,6 +277,7 @@ async def update_home_tab(client, event, logger):
     except Exception as e:
         logger.error(f"Error publishing home tab: {e}")
 
+
 @app.action("sendMessage")
 async def handle_send_message(ack, body, logger):
     await ack()
@@ -274,7 +288,9 @@ async def handle_send_message(ack, body, logger):
         await post_slack_door(f"Admin '{get_user_name(body)}' played predefine TTS: {text}")
         text_to_speech.non_blocking_speak(text)
     else:
-        logger.error(f"handle_send_message - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+        logger.error(
+            f"handle_send_message - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+
 
 @app.action("ttsMessage")
 async def handle_tts_message(ack, body, logger):
@@ -286,7 +302,9 @@ async def handle_tts_message(ack, body, logger):
         logger.info(f"TTS MESSAGE = {text}")
         text_to_speech.non_blocking_speak(text)
     else:
-        logger.error(f"handle_tts_message - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+        logger.error(
+            f"handle_tts_message - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+
 
 @app.action("unlock")
 async def handle_unlock(ack, body, logger):
@@ -305,7 +323,9 @@ async def handle_unlock(ack, body, logger):
             logger.info(msg)
             gpio_unlock(time_s)
     else:
-        logger.error(f"handle_unlock - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+        logger.error(
+            f"handle_unlock - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+
 
 @app.action("restartApp")
 async def handle_restart_app(ack, body, logger):
@@ -324,7 +344,9 @@ async def handle_restart_app(ack, body, logger):
         # Restart the app by exiting and letting systemd restart us
         sys.exit()
     else:
-        logger.error(f"handle_restart_app - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+        logger.error(
+            f"handle_restart_app - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+
 
 @app.action("rebootPi")
 async def handle_reboot_pi(ack, body, logger):
@@ -343,9 +365,11 @@ async def handle_reboot_pi(ack, body, logger):
         # Reboot the Raspberry Pi
         os.system('sudo reboot')
     else:
-        logger.error(f"handle_reboot_pi - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+        logger.error(
+            f"handle_reboot_pi - User not authorised for admin access. Allowed = '{config.admin_users}'.")
 
 # ======= Background Tasks =======
+
 
 async def read_tags():
     """Main worker coroutine to poll the RFID reader and unlock the door"""
@@ -369,26 +393,37 @@ async def read_tags():
                     level = user['door']
                     groups = user['groups']
 
-                    unlock_time = 5.0  # Default unlock time in seconds
+                    # Typically unlock for 5s
+                    unlock_time = 5.0
                     if 'delayed' in groups:
                         unlock_time = 30.0
                     gpio_unlock(unlock_time)
 
+                    # Play the sound
                     sound_player.play_access_granted_or_custom(user)
-                    general_logger.info(f"read_tags - Access granted: tag = '{tag}', user = {str(user)}")
+
+                    # Detailed log
+                    general_logger.info(
+                        f"read_tags - Access granted: tag = '{tag}', user = {str(user)}")
+
+                    # Slack log
                     response = await app.client.chat_postMessage(
                         channel=config.channel,
                         **slack_blocks.door_access(
                             name=name, tag=tag, status=':white_check_mark: Door unlocked', level=level),
                     )
 
-                    ts = response['ts']
-                    general_logger.debug(f"read_tags - chat ts = {ts}")
+                    # Webhook call (for home assistant).
+                    # Slack message timestamp so HA can add the photos.
+                    data = {'ts': response['ts'], }
+                    response = requests.put(config.access_granted_webhook, data=json.dumps(
+                        data), headers={'Content-type': 'application/json'})
 
                 else:
                     # Access denied
                     sound_player.play_denied()
-                    general_logger.info(f"read_tags - Access denied: tag = '{tag}'")
+                    general_logger.info(
+                        f"read_tags - Access denied: tag = '{tag}'")
                     await app.client.chat_postMessage(
                         channel=config.channel,
                         **slack_blocks.door_access(
@@ -403,10 +438,12 @@ async def read_tags():
                     text=f"Bad read: {msg}",
                 )
         except Exception as e:
-            general_logger.error(f"read_tags - An unexpected exception occurred: {e}")
+            general_logger.error(
+                f"read_tags - An unexpected exception occurred: {e}")
             await asyncio.sleep(5)
 
         await asyncio.sleep(0.1)
+
 
 async def relock_door():
     """Worker coroutine to countdown to relocking door"""
@@ -414,9 +451,11 @@ async def relock_door():
     while True:
         try:
             if global_lock_countdown_seconds > 0:
-                general_logger.debug(f"relock_door - start countdown: {global_lock_countdown_seconds=}")
+                general_logger.debug(
+                    f"relock_door - start countdown: {global_lock_countdown_seconds=}")
                 while True:
                     await asyncio.sleep(1)
+
                     def is_close_to_zero(value):
                         return math.isclose(value, 0.0, abs_tol=1e-9)
                     if is_close_to_zero(global_lock_countdown_seconds) or global_lock_countdown_seconds <= 0:
@@ -424,13 +463,16 @@ async def relock_door():
                         break
                     else:
                         global_lock_countdown_seconds -= 1
-                    general_logger.debug(f"relock_door - counting down: {global_lock_countdown_seconds=}")
+                    general_logger.debug(
+                        f"relock_door - counting down: {global_lock_countdown_seconds=}")
         except Exception as e:
-            general_logger.error(f"relock_door - An unexpected exception occurred: {e}")
+            general_logger.error(
+                f"relock_door - An unexpected exception occurred: {e}")
             gpio_lock()
             await asyncio.sleep(5)
 
         await asyncio.sleep(0.1)
+
 
 async def update_keys():
     """Worker coroutine to refresh keys from the API"""
@@ -447,23 +489,27 @@ async def update_keys():
                 )
                 await download_sounds()
         except Exception as e:
-            general_logger.error(f"update_keys - An unexpected exception occurred: {e}")
+            general_logger.error(
+                f"update_keys - An unexpected exception occurred: {e}")
             await asyncio.sleep(5)
 
         await asyncio.sleep(config.tidyauth_update_interval_seconds)
 
+
 async def download_sounds():
     """Worker coroutine download sounds"""
     users = user_manager.get_users_with_custom_sounds()
-    general_logger.debug(f"download_sounds - Check if sounds need downloading for {len(users)} users")
+    general_logger.debug(
+        f"download_sounds - Check if sounds need downloading for {len(users)} users")
     sound_downloader = SoundDownloader(
-        users_with_custom_sounds=users, 
+        users_with_custom_sounds=users,
         download_directory=config.custom_sounds_dir)
 
     # Download the sound files
     while sound_downloader.download_next_sound():
         # Allow other things to run between sound file downloads
         await asyncio.sleep(0.5)
+
 
 async def slack_logs_worker():
     """Worker coroutine post logs to slack when required"""
@@ -473,11 +519,13 @@ async def slack_logs_worker():
             if len(global_slack_log_queue) > 0:
                 await post_slack_log(global_slack_log_queue.pop())
         except Exception as e:
-            general_logger.error(f"slack_logs_worker - An unexpected exception occurred: {e}")
+            general_logger.error(
+                f"slack_logs_worker - An unexpected exception occurred: {e}")
             await asyncio.sleep(5)
         await asyncio.sleep(0.1)
 
 # ======= Main =======
+
 
 async def run():
     general_logger.info("run - Starting up")

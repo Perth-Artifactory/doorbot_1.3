@@ -14,5 +14,6 @@
     },
     "sounds_dir": "sounds",
     "custom_sounds_dir": "/mnt/usbdrive/doorbot-data/custom_sounds",
-    "log_path": "/mnt/usbdrive/doorbot-data/doorbot.log"
+    "log_path": "/mnt/usbdrive/doorbot-data/doorbot.log",
+    "access_granted_webhook": "http://homeassistant:8123/api/webhook/webhook_id"
 }
