@@ -114,5 +114,5 @@ def name_associations(tidyhq, legacy, output_file):
 # usage
 name_associations(
     '/mnt/usbdrive/doorbot-data/user_cache.json', 
-    '/mnt/usbdrive/doorbot-data/legacy-converted.json', 
+    '/mnt/usbdrive/doorbot-data/keys_converted.json', 
     '/mnt/usbdrive/doorbot-data/associations.json')
