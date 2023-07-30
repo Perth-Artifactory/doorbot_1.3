@@ -12,7 +12,7 @@ singleton_key_reader = None
 
 def callback(bits, value, reader_type):
     """Called when a wiegand string is read"""
-    if bits == 26:
+    if bits == 26 or bits == 34:
         # 26-bits is the 24-bit wiegand data with parity. Its the most widely supported format.
 
         # Parity checking from here:
