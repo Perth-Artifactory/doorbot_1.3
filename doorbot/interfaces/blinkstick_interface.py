@@ -29,7 +29,7 @@ class BlinkstickInterface:
         """Sets up blinkstick"""
         self.stick = blinkstick.find_first()
 
-    def ledset(self, col=Colour.WHITE):
+    def led_set(self, col=Colour.WHITE):
         """Set the colour by name"""
-        if col in self.COLOUR_LOOKUP.keys():
+        if self.stick is not None and col in self.COLOUR_LOOKUP.keys():
             self.stick.set_led_data(0, self.COLOUR_LOOKUP[col]*8)

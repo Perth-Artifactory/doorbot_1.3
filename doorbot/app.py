@@ -21,7 +21,7 @@ import requests
 from doorbot.interfaces import slack_blocks
 from doorbot.interfaces.doorbot_hat_gpio import DoorbotHatGpio
 from doorbot.interfaces.wiegand_key_reader import KeyReader
-from doorbot.interfaces.blinkstick_interface import BlinkstickInterface
+from doorbot.interfaces.blinkstick_interface import BlinkstickInterface, Colour
 from doorbot.interfaces.tidyauth_client import TidyAuthClient
 from doorbot.interfaces.user_manager import UserManager
 from doorbot.interfaces.sound_downloader import SoundDownloader
@@ -135,6 +135,7 @@ key_reader = KeyReader(pigpio_pi)
 
 # Blinkstick - more LEDs!
 blink = BlinkstickInterface()
+blink.led_set(Colour.WHITE)
 
 # Keep track of concurrent door unlocks with a countdown
 global_lock_countdown_seconds = 0
