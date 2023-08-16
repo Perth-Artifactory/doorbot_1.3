@@ -417,7 +417,7 @@ async def read_tags():
                     # Slack message timestamp so HA can add the photos.
                     data = {'ts': response['ts'], }
                     response = requests.put(config.access_granted_webhook, data=json.dumps(
-                        data), headers={'Content-type': 'application/json'})
+                        data), headers={'Content-type': 'application/json'}, timeout=1)
 
                 else:
                     # Access denied
