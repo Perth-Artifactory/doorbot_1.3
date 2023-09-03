@@ -10,6 +10,8 @@ ExecStartPre=sudo pigpiod
 ExecStart=/bin/bash -c 'source .venv/bin/activate; python -u -m doorbot'
 Restart=always
 RestartSec=3
+KillMode=control-group
+TimeoutStopSec=10s
 
 [Install]
 WantedBy=multi-user.target
