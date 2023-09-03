@@ -112,7 +112,8 @@ class Config:
         self.log_path = config["log_path"]
         self.access_granted_webhook = config["access_granted_webhook"]
 
-        self.admin_users = []
+        # Cache the usergroup_id once its been looked up
+        self.admin_usergroup_id = None
 
 
 # Load the config
@@ -178,17 +179,6 @@ def gpio_lock():
 
 # ======= Slack Helper Methods =======
 
-def check_auth(b):
-    """Check whether a user/channel is authorised to control doorbot via slack"""
-    try:
-        if b['user']['id'] in config.admin_users:
-            return True
-    except KeyError as e:
-        general_logger.error(f'check_auth exception: {e}')
-        pass
-    return False
-
-
 def get_user_name(b):
     try:
         return b['user']['name']
@@ -229,145 +219,153 @@ async def post_slack_log(message):
     )
 
 
-async def update_admin_users(client):
-    # Get list of usergroups
-    # Call the usergroups.list method to retrieve information about all usergroups in your workspace
-    response = await client.usergroups_list(include_users=False)
+# ======== Slack Matchers ==========
 
-    # Iterate through the list of usergroups and find the one with the specified name
-    usergroup_id = None
-    for group in response["usergroups"]:
-        if group["handle"] == config.admin_usergroup_handle:
-            usergroup_id = group["id"]
-            break
+async def check_user_authed(user_id):
+    """Check whether a user/channel is authorised to control doorbot via slack"""
+    try:
+        if config.admin_usergroup_id is None:
+            # Get list of usergroups
+            # Call the usergroups.list method to retrieve information about all usergroups in your workspace
+            response = await app.client.usergroups_list(include_users=False)
 
-    if usergroup_id is None:
-        raise Exception(
-            f"Could not find usergroup '{config.admin_usergroup_name}'")
+            # Iterate through the list of usergroups and find the one with the specified name
+            for group in response["usergroups"]:
+                if group["handle"] == config.admin_usergroup_handle:
+                    config.admin_usergroup_id = group["id"]
+                    break
 
-    # Update authorised users
-    response = await client.usergroups_users_list(usergroup=usergroup_id)
-    config.admin_users = response['users']
-    general_logger.debug(
-        f"update_admin_users - Admin users are: {', '.join(config.admin_users)}")
+            if config.admin_usergroup_id is None:
+                raise Exception(
+                    f"Could not find usergroup '{config.admin_usergroup_name}'")
+
+        # Get authorised users
+        response = await app.client.usergroups_users_list(usergroup=config.admin_usergroup_id)
+        admin_users = response['users']
+        general_logger.debug(
+            f"check_user_authed - Checking '{user_id}' (admin users: {', '.join(admin_users)})")
+
+        return user_id in admin_users
+
+    except Exception as e:
+        general_logger.error(f'check_user_authed - Exception: {e}')
+
+    return False
+
+
+async def authed_event(event):
+    try:
+        return await check_user_authed(event.get('user'))
+    except Exception as e:
+        general_logger.error(f'authed_event - Exception: {e}')
+    return False
+    
+async def authed_action(body):
+    try:
+        return await check_user_authed(body.get('user').get('id'))
+    except Exception as e:
+        general_logger.error(f'authed_action - Exception: {e}')
+    return False
 
 
 # ======= Slack Handlers =======
 
-@app.event("app_home_opened")
+@app.event("app_home_opened", matchers=[authed_event])
 async def update_home_tab(client, event, logger):
     try:
-        # Make sure we have a fresh list of admin users
-        await update_admin_users(client)
-
-        if event["user"] in config.admin_users:
-            # User is allowed to control doorbot via slack
-            # views.publish is the method that your app uses to push a view to the Home tab
-            await client.views_publish(
-                # the user that opened your app's app home
-                user_id=event["user"],
-                # the view object that appears in the app home
-                view=slack_blocks.home_view
-            )
-        else:
-            # User is not allowed to control doorbot via slack
-            await client.views_publish(
-                user_id=event["user"],
-                view=slack_blocks.home_view_denied
-            )
+        # views.publish is the method that your app uses to push a view to the Home tab
+        await client.views_publish(
+            # the user that opened your app's app home
+            user_id=event["user"],
+            # the view object that appears in the app home
+            view=slack_blocks.home_view
+        )
     except Exception as e:
         logger.error(f"Error publishing home tab: {e}")
 
 
-@app.action("sendMessage")
+@app.action("sendMessage", matchers=[authed_action])
 async def handle_send_message(ack, body, logger):
     await ack()
     logger.debug("app.action 'sendMessage':" + str(body))
-    if check_auth(body):
-        text = get_response_text(body)
-        logger.info(f"SEND MESSAGE = {text}")
-        await post_slack_door(f"Admin '{get_user_name(body)}' played predefine TTS: {text}")
-        text_to_speech.non_blocking_speak(text)
-    else:
-        logger.error(
-            f"handle_send_message - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+    text = get_response_text(body)
+    logger.info(f"SEND MESSAGE = {text}")
+    await post_slack_door(f"Admin '{get_user_name(body)}' played predefined TTS: {text}")
+    text_to_speech.non_blocking_speak(text)
 
 
-@app.action("ttsMessage")
+@app.action("ttsMessage", matchers=[authed_action])
 async def handle_tts_message(ack, body, logger):
     await ack()
     logger.debug("app.action 'ttsMessage':" + str(body))
-    if check_auth(body):
-        text = get_response_value(body)
-        await post_slack_door(f"Admin '{get_user_name(body)}' played TTS: {text}")
-        logger.info(f"TTS MESSAGE = {text}")
-        text_to_speech.non_blocking_speak(text)
-    else:
-        logger.error(
-            f"handle_tts_message - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+    text = get_response_value(body)
+    await post_slack_door(f"Admin '{get_user_name(body)}' played TTS: {text}")
+    logger.info(f"TTS MESSAGE = {text}")
+    text_to_speech.non_blocking_speak(text)
 
 
-@app.action("unlock")
+@app.action("unlock", matchers=[authed_action])
 async def handle_unlock(ack, body, logger):
     await ack()
     logger.debug("app.action 'unlock':" + str(body))
-    if check_auth(body):
-        value = get_response_value(body)
-        try:
-            time_s = float(value)
-        except ValueError:
-            logger.error("Invalid wait time: " + value)
-        else:
-            # Valid time
-            msg = f"Admin '{get_user_name(body)}' manually opened door for {time_s:.1f} seconds"
-            await post_slack_door(msg)
-            logger.info(msg)
-            gpio_unlock(time_s)
+    value = get_response_value(body)
+    try:
+        time_s = float(value)
+    except ValueError:
+        logger.error("Invalid wait time: " + value)
     else:
-        logger.error(
-            f"handle_unlock - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+        # Valid time
+        msg = f"Admin '{get_user_name(body)}' manually opened door for {time_s:.1f} seconds"
+        await post_slack_door(msg)
+        logger.info(msg)
+        gpio_unlock(time_s)
 
 
-@app.action("restartApp")
+@app.action("restartApp", matchers=[authed_action])
 async def handle_restart_app(ack, body, logger):
     # Acknowledge the action
     await ack()
     logger.debug("app.action 'handle_restart_app':" + str(body))
-    if check_auth(body):
-        # Logs about restart
-        msg = f"Admin '{get_user_name(body)}' has asked the doorbot app to restart"
-        await post_slack_door(msg)
-        logger.warning(msg)
+    # Logs about restart
+    msg = f"Admin '{get_user_name(body)}' has asked the doorbot app to restart"
+    await post_slack_door(msg)
+    logger.warning(msg)
 
-        # Give log messages a chance to flush out
-        await asyncio.sleep(1)
+    # Give log messages a chance to flush out
+    await asyncio.sleep(1)
 
-        # Restart the app by exiting and letting systemd restart us
-        sys.exit()
-    else:
-        logger.error(
-            f"handle_restart_app - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+    # Restart the app by exiting and letting systemd restart us
+    sys.exit()
 
 
-@app.action("rebootPi")
+@app.action("rebootPi", matchers=[authed_action])
 async def handle_reboot_pi(ack, body, logger):
     # Acknowledge the action
     await ack()
     logger.debug("app.action 'handle_restart_app':" + str(body))
-    if check_auth(body):
-        # Logs about restart
-        msg = f"Admin '{get_user_name(body)}' has asked the raspberry pi to reboot"
-        await post_slack_door(msg)
-        logger.warning(msg)
+    # Logs about restart
+    msg = f"Admin '{get_user_name(body)}' has asked the raspberry pi to reboot"
+    await post_slack_door(msg)
+    logger.warning(msg)
 
-        # Give log messages a chance to flush out
-        await asyncio.sleep(1)
+    # Give log messages a chance to flush out
+    await asyncio.sleep(1)
 
-        # Reboot the Raspberry Pi
-        os.system('sudo reboot')
-    else:
-        logger.error(
-            f"handle_reboot_pi - User not authorised for admin access. Allowed = '{config.admin_users}'.")
+    # Reboot the Raspberry Pi
+    os.system('sudo reboot')
+
+
+@app.action("livelinessCheck", matchers=[authed_action])
+async def handle_liveliness_check(ack, body, logger):
+    # Acknowledge the action
+    await ack()
+    logger.debug("app.action 'handle_liveliness_check':" + str(body))
+    
+    # Log and post about the liveliness check
+    msg = f"Admin '{get_user_name(body)}' has verified that the app is alive."
+    await post_slack_door(msg)
+    logger.info(msg)
+
 
 # ======= Background Tasks =======
 

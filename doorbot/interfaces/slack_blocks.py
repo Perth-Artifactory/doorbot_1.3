@@ -47,20 +47,20 @@ home_view = {
                             "text":
                             {
                                 "type": "plain_text",
-                                "text": "COVID shutdown notice",
+                                "text": "I know you're there",
                                 "emoji": True
                             },
-                            "value": "covid"
+                            "value": "notice_you"
                         },
                         {
                             "text":
                             {
                                 "type": "plain_text",
-                                "text": "I know you're there",
+                                "text": "Please check slack",
                                 "emoji": True
                             },
-                            "value": "notice_you"
-                        }
+                            "value": "check_slack"
+                        },
                     ],
                     "action_id": "sendMessage"
                 }
@@ -110,6 +110,16 @@ home_view = {
             "type": "actions",
             "elements":
             [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Liveliness Check",
+                        "emoji": True
+                    },
+                    "value": "liveliness_check",
+                    "action_id": "livelinessCheck"
+                },
                 {
                     "type": "button",
                     "text": {
@@ -165,7 +175,7 @@ home_view = {
                             "text": "No"
                         }
                     }
-                }
+                },
             ]
         }
     ]
