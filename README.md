@@ -33,7 +33,9 @@ Fill config:
 - Slack tokens: Create a new bot and generate the tokens. Bots cannot be transferred and there isn't really any downside to creating a new one. You need to give it the appropriate permissions (TODO - list them). You need to add the bot to channels you want it to interact with.
 - Update slack channels for user tracking and app logging.
 
-Permanently mount a USB drive
+Setup udev rules for blinkstick
+- create udev file `sudo nano /etc/udev/rules.d/85-blinkstick.rules`
+- udev file contents: `SUBSYSTEM=="usb", MODE:="0666"`
 
 
 Copy service files in and load them:
