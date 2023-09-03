@@ -1,5 +1,5 @@
 # ____ Doorbot Specific Ignores _____
-sounds/custom
+data/
 .vscode
 .venv
 *.csv
