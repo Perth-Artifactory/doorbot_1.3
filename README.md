@@ -64,6 +64,19 @@ journalctl -xe -u doorbot -f
 
 Logs also go to file `doorbot.log` and to Slack (INFO and above).
 
+## Colour Codes
+
+The blinkstick will report colours like so:
+- Startup: blue
+- Normal Operation: white
+- Liveliness Check (from Slack): dim white (1s)
+- Restart App (from Slack): light purple (1s), dark blue
+- Reboot Pi (from Slack): dark purple (1s), dark blue
+- Access Granted (door unlock): green (while unlocked)
+- Access Denied (tag not in allowed list): red (5s)
+- Bad Read (tag not valid length): dark red (5s)
+- Keys Updated: aqua (1s)
+
 ## Development
 
 Run this in commandline to activate the python virtual environment:
