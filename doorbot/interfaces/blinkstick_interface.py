@@ -23,5 +23,7 @@ class BlinkstickInterface:
 
     def set_colour_rgb(self, red, green, blue):
         if self.stick is not None:
-            self.stick.set_color(red=red, green=green, blue=blue)
+            # Set all 8 LEDs
+            for index in range(8):
+                self.stick.set_color(index=index, red=red, green=green, blue=blue)
 
