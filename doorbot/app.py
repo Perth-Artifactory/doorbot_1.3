@@ -5,7 +5,7 @@ RFID and NFC based access control system for the Perth Artifactory.
 Interfaces with Slack and other services for administration and logging.
 """
 
-import math
+import time
 import sys
 import logging
 from logging.handlers import RotatingFileHandler
@@ -26,6 +26,7 @@ from doorbot.interfaces.tidyauth_client import TidyAuthClient
 from doorbot.interfaces.user_manager import UserManager
 from doorbot.interfaces.sound_downloader import SoundDownloader
 from doorbot.interfaces.sound_player import SoundPlayer
+from doorbot.interfaces.monotonic_waiter import MonotonicWaiter
 from doorbot.interfaces import text_to_speech
 
 # ======= Logging =======
@@ -124,6 +125,7 @@ config = Config()
 
 # Setup all the logging
 setup_logging(config.log_path)
+general_logger.info(f'########## STARTUP ##########')
 
 # App should only create this once
 pigpio_pi = pigpio.pi()
@@ -137,10 +139,11 @@ key_reader = KeyReader(pigpio_pi)
 # Blinkstick - more LEDs! Startup Blue until its ready - White once ready
 blink = BlinkstickInterface()
 blink.set_colour_name('blue')
-global_blinkstick_countdown_seconds = 0
 
-# Keep track of concurrent door unlocks with a countdown
-global_lock_countdown_seconds = 0
+# Timers
+timer_relock = MonotonicWaiter(name='door_relock')
+timer_blinkstick_white = MonotonicWaiter(name='blinkstick_white')
+timer_keys_update = MonotonicWaiter(name='keys_update')
 
 # TidyAuth API Client
 tidyauth_client = TidyAuthClient(
@@ -162,20 +165,13 @@ app = AsyncApp(token=config.SLACK_BOT_TOKEN)
 
 def gpio_unlock(time_s: float):
     hat_gpio.set_relay(config.relay_channel, True)
-    global global_lock_countdown_seconds
-    if time_s > global_lock_countdown_seconds:
-        # Start or extend unlock time
-        global_lock_countdown_seconds = time_s
-        general_logger.info(
-            f"gpio_unlock - Unlock door for {global_lock_countdown_seconds} s")
-    else:
-        general_logger.info(
-            f"gpio_unlock - Door already unlocked for another {global_lock_countdown_seconds} s (requested: {time_s=} s)")
+    timer_relock.set_wait_time(duration_s=time_s)
+    general_logger.info(f"gpio_unlock - Unlock door for {time_s} s")
 
 
 def gpio_lock():
-    general_logger.info(f"gpio_lock - Locking door")
     hat_gpio.set_relay(config.relay_channel, False)
+    general_logger.info(f"gpio_lock - Locked door")
 
 
 # ======= Slack Helper Methods =======
@@ -260,7 +256,8 @@ async def authed_event(event):
     except Exception as e:
         general_logger.error(f'authed_event - Exception: {e}')
     return False
-    
+
+
 async def authed_action(body):
     try:
         return await check_user_authed(body.get('user').get('id'))
@@ -285,14 +282,27 @@ async def update_home_tab(client, event, logger):
         logger.error(f"Error publishing home tab: {e}")
 
 
+@app.event("app_home_opened")
+async def update_home_tab(client, event, logger):
+    """Fallback handler for unauthorised"""
+    try:
+        await client.views_publish(
+            # the user that opened your app's app home
+            user_id=event["user"],
+            view=slack_blocks.home_view_denied
+        )
+    except Exception as e:
+        logger.error(f"Error publishing home tab denied: {e}")
+
+
 @app.action("sendMessage", matchers=[authed_action])
 async def handle_send_message(ack, body, logger):
     await ack()
     logger.debug("app.action 'sendMessage':" + str(body))
     text = get_response_text(body)
+    text_to_speech.non_blocking_speak(text)
     logger.info(f"SEND MESSAGE = {text}")
     await post_slack_door(f"Admin '{get_user_name(body)}' played predefined text-to-speech: {text}")
-    text_to_speech.non_blocking_speak(text)
 
 
 @app.action("ttsMessage", matchers=[authed_action])
@@ -300,9 +310,9 @@ async def handle_tts_message(ack, body, logger):
     await ack()
     logger.debug("app.action 'ttsMessage':" + str(body))
     text = get_response_value(body)
-    await post_slack_door(f"Admin '{get_user_name(body)}' played text-to-speech: {text}")
-    logger.info(f"TTS MESSAGE = {text}")
     text_to_speech.non_blocking_speak(text)
+    logger.info(f"TTS MESSAGE = {text}")
+    await post_slack_door(f"Admin '{get_user_name(body)}' played text-to-speech: {text}")
 
 
 @app.action("unlock", matchers=[authed_action])
@@ -316,10 +326,11 @@ async def handle_unlock(ack, body, logger):
         logger.error("Invalid wait time: " + value)
     else:
         # Valid time
-        msg = f"Admin '{get_user_name(body)}' manually opened door for {time_s:.1f} seconds"
-        await post_slack_door(msg)
-        logger.info(msg)
+        msg = f"Admin '{get_user_name(body)}' manually opened door for {time_s:.0f} seconds"
         gpio_unlock(time_s)
+        logger.info(msg)
+        await post_slack_door(msg)
+        text_to_speech.non_blocking_speak(f'Door has been opened for {time_s:.0f} seconds')
 
 
 @app.action("restartApp", matchers=[authed_action])
@@ -332,14 +343,13 @@ async def handle_restart_app(ack, body, logger):
 
     # Logs about restart
     msg = f"Admin '{get_user_name(body)}' has asked the doorbot app to restart"
-    await post_slack_door(msg)
     logger.warning(msg)
+    await post_slack_door(msg)
 
     # Give log messages a chance to flush out
     await asyncio.sleep(1)
 
-    # Set blinkstick purple
-    blink.set_colour_name('navy')
+    blink.set_colour_name('navy')  # dark blue
 
     # Restart the app by exiting and letting systemd restart us
     sys.exit()
@@ -355,8 +365,8 @@ async def handle_reboot_pi(ack, body, logger):
 
     # Logs about restart
     msg = f"Admin '{get_user_name(body)}' has asked the raspberry pi to reboot"
-    await post_slack_door(msg)
     logger.warning(msg)
+    await post_slack_door(msg)
 
     # Give log messages a chance to flush out
     await asyncio.sleep(1)
@@ -369,20 +379,18 @@ async def handle_reboot_pi(ack, body, logger):
 
 @app.action("livelinessCheck", matchers=[authed_action])
 async def handle_liveliness_check(ack, body, logger):
-    global global_blinkstick_countdown_seconds
-
     # Acknowledge the action
     await ack()
     logger.debug("app.action 'handle_liveliness_check':" + str(body))
 
     # Briefly show a dimmer white
     blink.set_colour_name('gray')
-    global_blinkstick_countdown_seconds = 1
+    timer_blinkstick_white.set_wait_time(duration_s=1)
 
     # Log and post about the liveliness check
-    msg = f"Admin '{get_user_name(body)}' has verified that the app is alive."
-    await post_slack_door(msg)
+    msg = f"Admin '{get_user_name(body)}' has requested liveliness check - alive!"
     logger.info(msg)
+    await post_slack_door(msg)
 
 
 # ======= Background Tasks =======
@@ -390,18 +398,20 @@ async def handle_liveliness_check(ack, body, logger):
 
 async def read_tags():
     """Main worker coroutine to poll the RFID reader and unlock the door"""
-    global global_blinkstick_countdown_seconds
 
     # Set blinkstick to WHITE as idle
     blink.set_white()
 
-    await app.client.chat_postMessage(
-        channel=config.channel,
-        text="Doorbot 1.3 Slack App Starting",
-    )
+    general_logger.info("Ready to read tags")
 
+    loop_counter = 0
     while True:
         try:
+            if loop_counter % 36000 == 0:
+                # Hourly log of tag reading
+                general_logger.debug('Reading tags...')
+            loop_counter += 1
+
             if len(key_reader.pending_keys) > 0:
                 tag = key_reader.pending_keys.pop(0)
 
@@ -449,7 +459,7 @@ async def read_tags():
 
                     # Set blinkstick red for 5 seconds
                     blink.set_colour_name('red')
-                    global_blinkstick_countdown_seconds = 5
+                    timer_blinkstick_white.set_wait_time(duration_s=5)
 
                     sound_player.play_denied()
                     general_logger.info(
@@ -460,12 +470,11 @@ async def read_tags():
                             name="Unknown", tag=tag, status=':x: Access denied', level="Unknown")
                     )
 
-
             if len(key_reader.pending_errors) > 0:
 
                 # Set blinkstick off-red for 5 seconds
                 blink.set_colour_name('maroon')
-                global_blinkstick_countdown_seconds = 5
+                timer_blinkstick_white.set_wait_time(duration_s=5)
 
                 msg = key_reader.pending_errors.pop(0)
                 general_logger.info(f"read_tags - Bad read: {msg}")
@@ -477,73 +486,56 @@ async def read_tags():
         except Exception as e:
             general_logger.error(
                 f"read_tags - An unexpected exception occurred: {e}")
+
+            # Set blinkstick off-red while giving exception its sleep to prevent rapid
+            # exception spins.
+            blink.set_colour_name('maroon')
             await asyncio.sleep(5)
+            blink.set_colour_name('white')
 
         await asyncio.sleep(0.1)
 
 
 async def relock_door():
-    """Worker coroutine to countdown to relocking door"""
-    global global_lock_countdown_seconds
+    """Worker coroutine to relock the door using a monotonic clock"""
     while True:
         try:
-            if global_lock_countdown_seconds > 0:
-                general_logger.debug(
-                    f"relock_door - start countdown: {global_lock_countdown_seconds=}")
-                while True:
-                    await asyncio.sleep(1)
-                    if global_lock_countdown_seconds <= 0:
-                        # Lock the door
-                        gpio_lock()
-                        # Reset blinkstick to white
-                        blink.set_white()
-                        break
-                    else:
-                        global_lock_countdown_seconds -= 1
-                    general_logger.debug(
-                        f"relock_door - counting down: {global_lock_countdown_seconds=}")
+            done = await timer_relock.wait()
+            if done:
+                # Lock the door
+                gpio_lock()
+
+                # Reset blinkstick to white
+                blink.set_white()
+
         except Exception as e:
             general_logger.error(
                 f"relock_door - An unexpected exception occurred: {e}")
             gpio_lock()
             await asyncio.sleep(5)
 
-        await asyncio.sleep(0.1)
-
 
 async def clear_blinkstick():
     """Worker coroutine to change blinkstick back to white after a delay"""
-    global global_blinkstick_countdown_seconds
     while True:
         try:
-            if global_blinkstick_countdown_seconds > 0:
-                general_logger.debug(
-                    f"clear_blinkstick - start countdown: {global_blinkstick_countdown_seconds=}")
-                while True:
-                    await asyncio.sleep(1)
-                    if global_blinkstick_countdown_seconds <= 0:
-                        # Reset blinkstick to white
-                        blink.set_white()
-                        break
-                    else:
-                        global_blinkstick_countdown_seconds -= 1
-                    general_logger.debug(
-                        f"clear_blinkstick - counting down: {global_blinkstick_countdown_seconds=}")
+            done = await timer_blinkstick_white.wait()
+            if done:
+                # Reset blinkstick to white
+                blink.set_white()
+
         except Exception as e:
             general_logger.error(
                 f"clear_blinkstick - An unexpected exception occurred: {e}")
             gpio_lock()
             await asyncio.sleep(5)
 
-        await asyncio.sleep(0.1)
-
 
 async def update_keys():
     """Worker coroutine to refresh keys from the API"""
-    global global_blinkstick_countdown_seconds
     while True:
         try:
-            # Update on startup
+            # TODO: Use timer
             general_logger.debug("update_keys - Update data from tidyauth")
             changed = await user_manager.download_keys()
             if changed:
@@ -551,11 +543,11 @@ async def update_keys():
 
                 # Set blinkstick light blue for 1 seconds
                 blink.set_colour_name('aqua')
-                global_blinkstick_countdown_seconds = 1
+                timer_blinkstick_white.set_wait_time(duration_s=1)
 
                 await app.client.chat_postMessage(
                     channel=config.channel,
-                    text="Keys updated (change received from TidyAPI)"
+                    text="Key list has changed (TidyAuth)"
                 )
                 await download_sounds()
         except Exception as e:
@@ -598,7 +590,13 @@ async def slack_logs_worker():
 
 
 async def run():
-    general_logger.info("run - Starting up")
+    msg_start = "Doorbot 1.3 Slack App Starting"
+    general_logger.info(f'Sending startup message: {msg_start}')
+    await app.client.chat_postMessage(
+        channel=config.channel,
+        text=msg_start,
+    )
+
     asyncio.ensure_future(read_tags())
     asyncio.ensure_future(relock_door())
     asyncio.ensure_future(update_keys())

@@ -74,7 +74,7 @@ The blinkstick will report colours like so:
 - Reboot Pi (from Slack): dark purple (1s), dark blue
 - Access Granted (door unlock): green (while unlocked)
 - Access Denied (tag not in allowed list): red (5s)
-- Bad Read (tag not valid length): dark red (5s)
+- Bad Read (tag not valid length) or Tag Code Exception: dark red (5s)
 - Keys Updated: aqua (1s)
 
 ## Development
