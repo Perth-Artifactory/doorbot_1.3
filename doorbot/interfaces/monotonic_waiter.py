@@ -22,11 +22,11 @@ class MonotonicWaiter:
         self.name = name
         self._expiry_time = None
 
-    def set_wait_time(self, duration: float):
+    def set_wait_time(self, duration_s: float):
         """
-        Set or extend the wait duration. 
+        Set or extend the wait duration in seconds. 
         """
-        new_expiry_time = time.monotonic() + duration
+        new_expiry_time = time.monotonic() + duration_s
         self._expiry_time = new_expiry_time
 
     async def wait(self) -> bool:
@@ -41,5 +41,7 @@ class MonotonicWaiter:
                 return True
             else:
                 await asyncio.sleep(1)
+        else:
+            await asyncio.sleep(1)
 
         return False
