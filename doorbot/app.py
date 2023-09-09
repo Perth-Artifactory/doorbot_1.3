@@ -123,6 +123,9 @@ config = Config()
 
 # ======= Setup =======
 
+# Record start time for uptime report
+start_time = time.monotonic()
+
 # Setup all the logging
 setup_logging(config.log_path)
 general_logger.info(f'########## STARTUP ##########')
@@ -388,8 +391,13 @@ async def handle_liveliness_check(ack, body, logger):
     blink.set_colour_name('gray')
     timer_blinkstick_white.set_wait_time(duration_s=1)
 
+    # Calculate uptime
+    uptime_seconds = time.monotonic() - start_time
+    days, remainder = divmod(uptime_seconds, 3600*24)
+    hours, _ = divmod(remainder, 3600)
+
     # Log and post about the liveliness check
-    msg = f"Admin '{get_user_name(body)}' has requested liveliness check - alive!"
+    msg = f"Admin '{get_user_name(body)}' has requested liveliness check (uptime {int(days)}d {int(hours)}h)"
     logger.info(msg)
     await post_slack_door(msg)
 
