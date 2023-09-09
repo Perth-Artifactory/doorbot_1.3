@@ -330,7 +330,8 @@ async def handle_unlock(ack, body, logger):
         gpio_unlock(time_s)
         logger.info(msg)
         await post_slack_door(msg)
-        text_to_speech.non_blocking_speak(f'Door has been opened for {time_s:.0f} seconds')
+        text_to_speech.non_blocking_speak(
+            f'Door has been opened for {time_s:.0f} seconds')
 
 
 @app.action("restartApp", matchers=[authed_action])
@@ -461,6 +462,9 @@ async def read_tags():
                     blink.set_colour_name('red')
                     timer_blinkstick_white.set_wait_time(duration_s=5)
 
+                    # Queue key update (in case this key has been recently added)
+                    timer_keys_update.set_wait_time(duration_s=1)
+
                     sound_player.play_denied()
                     general_logger.info(
                         f"read_tags - Access denied: tag = '{tag}'")
@@ -497,7 +501,7 @@ async def read_tags():
 
 
 async def relock_door():
-    """Worker coroutine to relock the door using a monotonic clock"""
+    """Worker coroutine to relock the door after provided wait"""
     while True:
         try:
             done = await timer_relock.wait()
@@ -533,33 +537,51 @@ async def clear_blinkstick():
 
 async def update_keys():
     """Worker coroutine to refresh keys from the API"""
+
+    async def _update():
+        """Helper function to do the actual update and logging"""
+        general_logger.debug("update_keys - Update data from tidyauth")
+        changed = await user_manager.download_keys()
+        if changed:
+            general_logger.info("update_keys - Keys changed")
+
+            # Set blinkstick light blue for 1 seconds
+            blink.set_colour_name('aqua')
+            timer_blinkstick_white.set_wait_time(duration_s=1)
+
+            await app.client.chat_postMessage(
+                channel=config.channel,
+                text="Key list has changed (TidyAuth)"
+            )
+            await download_sounds()
+
+    # Initial update
+    try:
+        timer_keys_update.set_wait_time(
+            config.tidyauth_update_interval_seconds)
+        await _update()
+    except Exception as e:
+        general_logger.error(
+            f"update_keys - An unexpected exception occurred during initial update: {e}")
+
     while True:
         try:
-            # TODO: Use timer
-            general_logger.debug("update_keys - Update data from tidyauth")
-            changed = await user_manager.download_keys()
-            if changed:
-                general_logger.info("update_keys - Keys changed")
+            done = await timer_keys_update.wait()
+            if done:
+                # Do the update and then set the configured interval to wait again for next time.
+                # May be brought earlier if there is an invalid key read.
+                await _update()
+                timer_keys_update.set_wait_time(
+                    config.tidyauth_update_interval_seconds)
 
-                # Set blinkstick light blue for 1 seconds
-                blink.set_colour_name('aqua')
-                timer_blinkstick_white.set_wait_time(duration_s=1)
-
-                await app.client.chat_postMessage(
-                    channel=config.channel,
-                    text="Key list has changed (TidyAuth)"
-                )
-                await download_sounds()
         except Exception as e:
             general_logger.error(
                 f"update_keys - An unexpected exception occurred: {e}")
             await asyncio.sleep(5)
 
-        await asyncio.sleep(config.tidyauth_update_interval_seconds)
-
 
 async def download_sounds():
-    """Worker coroutine download sounds"""
+    """Download sounds helper"""
     users = user_manager.get_users_with_custom_sounds()
     general_logger.debug(
         f"download_sounds - Check if sounds need downloading for {len(users)} users")
@@ -585,6 +607,7 @@ async def slack_logs_worker():
                 f"slack_logs_worker - An unexpected exception occurred: {e}")
             await asyncio.sleep(5)
         await asyncio.sleep(0.1)
+
 
 # ======= Main =======
 
