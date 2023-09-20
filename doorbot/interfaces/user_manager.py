@@ -21,7 +21,12 @@ class UserManager:
 
     def is_key_authorised(self, key):
         """Return True if key is authorised to open the door"""
-        return key in self.user_data
+        return self.user_data is not None and key in self.user_data
+    
+    def key_count(self):
+        if self.user_data is None:
+            return 0
+        return len(self.user_data)
     
     def get_user_details(self, key):
         if self.user_data is not None and key in self.user_data:

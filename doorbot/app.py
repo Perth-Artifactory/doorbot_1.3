@@ -551,7 +551,7 @@ async def update_keys():
         general_logger.debug("update_keys - Update data from tidyauth")
         changed = await user_manager.download_keys()
         if changed:
-            general_logger.info("update_keys - Keys changed")
+            general_logger.info(f"update_keys - Keys changed (total number of keys = {user_manager.key_count()} )")
 
             # Set blinkstick light blue for 1 seconds
             blink.set_colour_name('aqua')
