@@ -488,12 +488,9 @@ async def read_tags():
                 blink.set_colour_name('maroon')
                 timer_blinkstick_white.set_wait_time(duration_s=5)
 
+                # Loggers only. Don't send to main door channel.
                 msg = key_reader.pending_errors.pop(0)
                 general_logger.info(f"read_tags - Bad read: {msg}")
-                await app.client.chat_postMessage(
-                    channel=config.channel,
-                    text=f"Bad read: {msg}",
-                )
 
         except Exception as e:
             general_logger.error(
