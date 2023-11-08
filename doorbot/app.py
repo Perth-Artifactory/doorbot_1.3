@@ -402,6 +402,21 @@ async def handle_liveliness_check(ack, body, logger):
     await post_slack_door(msg)
 
 
+@app.action("updateKeys", matchers=[authed_action])
+async def handle_update_keys(ack, body, logger):
+    # Acknowledge the action
+    await ack()
+    logger.debug("app.action 'update_keys':" + str(body))
+
+    # Queue key update
+    timer_keys_update.set_wait_time(duration_s=1)
+
+    # Log and post about the key update
+    msg = f"Admin '{get_user_name(body)}' has requested keys update"
+    logger.info(msg)
+    await post_slack_door(msg)
+
+
 # ======= Background Tasks =======
 
 

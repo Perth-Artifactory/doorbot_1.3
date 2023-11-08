@@ -105,11 +105,25 @@ home_view = {
             "type": "divider"
         },
         
-        # Add buttons for Restarting App and Rebooting Raspberry Pi
+        # Add buttons for the actions:
+        # - update keys
+        # - livliness check
+        # - Restarting App 
+        # - Rebooting Raspberry Pi
         {
             "type": "actions",
             "elements":
             [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Update Keys",
+                        "emoji": True
+                    },
+                    "value": "update_keys",
+                    "action_id": "updateKeys"
+                },
                 {
                     "type": "button",
                     "text": {
