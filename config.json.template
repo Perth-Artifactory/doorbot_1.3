@@ -6,14 +6,16 @@
     "slack_channel_logs": "#doorbot-test-2",
     "admin_usergroup_handle": "doorbot-admins",
     "relay_channel": "R1",
+    "door_sensor_channel": "SW1",
     "tidyauth": {
         "url": "http://enclave:5000",
         "token": "",
-        "cache_file": "/mnt/usbdrive/doorbot-data/user_cache.json",
+        "cache_file": "/home/pi/doorbot_1.3/data/user_cache.json",
         "update_interval_seconds": 60.0
     },
     "sounds_dir": "sounds",
-    "custom_sounds_dir": "/mnt/usbdrive/doorbot-data/custom_sounds",
-    "log_path": "/mnt/usbdrive/doorbot-data/doorbot.log",
-    "access_granted_webhook": "http://homeassistant:8123/api/webhook/webhook_id"
+    "custom_sounds_dir": "/home/pi/doorbot_1.3/data/custom_sounds",
+    "log_path": "/home/pi/doorbot_1.3/data/doorbot.log",
+    "access_granted_webhook": "http://ha:8123/api/webhook/xxx",
+    "door_sensor_webhook": "http://ha:8123/api/webhook/xxxx"
 }

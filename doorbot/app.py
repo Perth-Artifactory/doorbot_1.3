@@ -104,6 +104,7 @@ class Config:
         self.channel_logs = config["slack_channel_logs"]
         self.admin_usergroup_handle = config["admin_usergroup_handle"]
         self.relay_channel = config["relay_channel"]
+        self.door_sensor_channel = config["door_sensor_channel"]
         self.tidyauth_url = config["tidyauth"]["url"]
         self.tidyauth_token = config["tidyauth"]["token"]
         self.tidyauth_cache_file = config["tidyauth"]["cache_file"]
@@ -112,6 +113,7 @@ class Config:
         self.custom_sounds_dir = config["custom_sounds_dir"]
         self.log_path = config["log_path"]
         self.access_granted_webhook = config["access_granted_webhook"]
+        self.door_sensor_webhook = config["door_sensor_webhook"]
 
         # Cache the usergroup_id once its been looked up
         self.admin_usergroup_id = None
@@ -135,6 +137,9 @@ pigpio_pi = pigpio.pi()
 
 # Load the Doorbot hat GPIO
 hat_gpio = DoorbotHatGpio(pigpio_pi)
+
+# Door "closed" sensor's last state to trigger webhook on change
+door_sensor_last_state = None
 
 # Create RFID reader class
 key_reader = KeyReader(pigpio_pi)
@@ -629,6 +634,27 @@ async def slack_logs_worker():
         await asyncio.sleep(0.1)
 
 
+async def input_reader():
+    """Worker coroutine to read inputs - for door open switch"""
+    global door_sensor_last_state
+    while True:
+        try:
+            status = hat_gpio.read_switches()
+            door_state = status[config.door_sensor_channel]
+            if door_sensor_last_state is None or door_state != door_sensor_last_state:
+                door_sensor_last_state = door_state
+                door_status_string = {False: 'open', True: 'closed'}[door_state]
+                general_logger.info(f"Door closed sensor: {door_status_string}")
+                data = {'door_status': door_status_string, }
+                requests.put(config.door_sensor_webhook, data=json.dumps(
+                    data), headers={'Content-type': 'application/json'}, timeout=1)
+
+        except Exception as e:
+            general_logger.error(
+                f"input_reader - An unexpected exception occurred: {e}")
+            await asyncio.sleep(5)
+        await asyncio.sleep(0.1)
+
 # ======= Main =======
 
 
@@ -645,6 +671,7 @@ async def run():
     asyncio.ensure_future(update_keys())
     asyncio.ensure_future(download_sounds())
     asyncio.ensure_future(slack_logs_worker())
+    asyncio.ensure_future(input_reader())
     handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
     await handler.start_async()
 
