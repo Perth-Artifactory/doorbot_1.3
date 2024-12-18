@@ -177,3 +177,4 @@ class DoorbotHatGpio:
             if switch.has_changed():
                 value = switch.value()
                 self.log("Switch '{}' Changed to '{}'".format(id, value))
+        return results

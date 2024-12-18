@@ -11,7 +11,12 @@ def main():
     hat.set_relay(door_channel, True)
     time.sleep(1)
     hat.set_relay(door_channel, False)
-    # time.sleep(1)
+    time.sleep(1)
+
+    while True:
+        print(hat.read_switches())
+        time.sleep(0.1)
+
 
 if __name__ == "__main__":
     main()
