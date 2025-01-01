@@ -113,7 +113,8 @@ class Config:
         self.custom_sounds_dir = config["custom_sounds_dir"]
         self.log_path = config["log_path"]
         self.access_granted_webhook = config["access_granted_webhook"]
-        self.door_sensor_webhook = config["door_sensor_webhook"]
+        self.door_sensor_ha_api_url = config["door_sensor_ha_api_url"]
+        self.home_assistant_token = config["home_assistant_token"]
 
         # Cache the usergroup_id once its been looked up
         self.admin_usergroup_id = None
@@ -645,9 +646,27 @@ async def input_reader():
                 door_sensor_last_state = door_state
                 door_status_string = {False: 'open', True: 'closed'}[door_state]
                 general_logger.info(f"Door closed sensor: {door_status_string}")
-                data = {'door_status': door_status_string, }
-                requests.put(config.door_sensor_webhook, data=json.dumps(
-                    data), headers={'Content-type': 'application/json'}, timeout=1)
+
+                # Define payload and headers
+                payload = {
+                    "state": door_status_string,
+                    "attributes": {
+                        "device_class": "door"
+                    }
+                }
+                headers = {
+                    "Authorization": f"Bearer {config.home_assistant_token}",
+                    "Content-Type": "application/json"
+                }
+
+                # Sending the POST request - will update/create home assistant entity
+                response = requests.post(config.door_sensor_ha_api_url, json=payload, headers=headers, timeout=0.1)
+
+                # Check the response
+                if response.status_code in (200, 201):
+                    general_logger.debug(f"Success: {response.json()}")
+                else:
+                    general_logger.error(f"HTTP Error {response.status_code}: {response.text}")
 
         except Exception as e:
             general_logger.error(
