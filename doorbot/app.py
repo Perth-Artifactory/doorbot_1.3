@@ -12,6 +12,7 @@ from logging.handlers import RotatingFileHandler
 import json
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.app.async_app import AsyncApp
+from slack_sdk.errors import SlackApiError
 import asyncio
 import pigpio
 import re
@@ -225,6 +226,49 @@ async def post_slack_log(message):
     )
 
 
+def loading_button(body):
+    """Takes the body of a view_submission and returns a constructed view with the appropriate button updated with a loading button"""
+
+    patching_block = body["actions"][0]
+
+    new_blocks = []
+
+    for block in body["view"]["blocks"]:
+        if block["block_id"] == patching_block["block_id"]:
+            for element in block["elements"]:
+                if element["action_id"] == patching_block["action_id"]:
+                    element["text"]["text"] += " :spinthinking:"
+            new_blocks.append(block)
+        else:
+            new_blocks.append(block)
+
+    view = {
+        "type": "modal",
+        "callback_id": body["view"]["callback_id"],
+        "title": body["view"]["title"],
+        "blocks": new_blocks,
+        "clear_on_close": True,
+    }
+
+    if body["view"].get("submit"):
+        view["submit"] = body["view"]["submit"]
+    if body["view"].get("close"):
+        view["close"] = body["view"]["close"]
+
+    return view
+
+
+async def set_loading_icon_on_button(body, client, logger):
+    """Set the spinning face going on the button"""
+    view = loading_button(body)
+    try:
+        await client.views_update(view_id=body["view"]["id"], view=view)
+        logger.info("Temporary loading button pushed")
+    except SlackApiError as e:
+        logger.error(f"Failed to push modal: {e.response['error']}")
+        logger.error(e.response["response_metadata"]["messages"])
+
+
 # ======== Slack Matchers ==========
 
 async def check_user_authed(user_id):
@@ -306,112 +350,153 @@ async def update_home_tab(client, event, logger):
 
 @app.action("sendMessage", matchers=[authed_action])
 async def handle_send_message(ack, body, logger):
-    await ack()
-    logger.debug("app.action 'sendMessage':" + str(body))
-    text = get_response_text(body)
-    text_to_speech.non_blocking_speak(text)
-    logger.info(f"SEND MESSAGE = {text}")
-    await post_slack_door(f"Admin '{get_user_name(body)}' played predefined text-to-speech: {text}")
+    try:
+        await ack()
+        logger.debug("app.action 'sendMessage':" + str(body))
+        text = get_response_text(body)
+        text_to_speech.non_blocking_speak(text)
+        logger.info(f"SEND MESSAGE = {text}")
+        await post_slack_door(f"Admin '{get_user_name(body)}' played predefined text-to-speech: {text}")
+    except Exception as e:
+        logger.error(f"Error in handle_send_message: {e}")
 
 
 @app.action("ttsMessage", matchers=[authed_action])
 async def handle_tts_message(ack, body, logger):
-    await ack()
-    logger.debug("app.action 'ttsMessage':" + str(body))
-    text = get_response_value(body)
-    text_to_speech.non_blocking_speak(text)
-    logger.info(f"TTS MESSAGE = {text}")
-    await post_slack_door(f"Admin '{get_user_name(body)}' played text-to-speech: {text}")
+    try:
+        await ack()
+        logger.debug("app.action 'ttsMessage':" + str(body))
+        text = get_response_value(body)
+        text_to_speech.non_blocking_speak(text)
+        logger.info(f"TTS MESSAGE = {text}")
+        await post_slack_door(f"Admin '{get_user_name(body)}' played text-to-speech: {text}")
+    except Exception as e:
+        logger.error(f"Error in handle_tts_message: {e}")
 
 
 @app.action("unlock", matchers=[authed_action])
-async def handle_unlock(ack, body, logger):
-    await ack()
-    logger.debug("app.action 'unlock':" + str(body))
-    value = get_response_value(body)
+async def handle_unlock(ack, body, logger, client):
     try:
-        time_s = float(value)
-    except ValueError:
-        logger.error("Invalid wait time: " + value)
-    else:
-        # Valid time
-        msg = f"Admin '{get_user_name(body)}' manually opened door for {time_s:.0f} seconds"
-        gpio_unlock(time_s)
-        logger.info(msg)
-        await post_slack_door(msg)
-        text_to_speech.non_blocking_speak(
-            f'Door has been opened for {time_s:.0f} seconds')
+        await ack()
+
+        # Set the spinning face going on the button
+        await set_loading_icon_on_button(body=body, client=client, logger=logger)
+
+        logger.debug("app.action 'unlock':" + str(body))
+        value = get_response_value(body)
+        try:
+            time_s = float(value)
+        except ValueError:
+            logger.error("Invalid wait time: " + value)
+        else:
+            # Valid time
+            msg = f"Admin '{get_user_name(body)}' manually opened door for {time_s:.0f} seconds"
+            gpio_unlock(time_s)
+            logger.info(msg)
+            await post_slack_door(msg)
+            text_to_speech.non_blocking_speak(
+                f'Door has been opened for {time_s:.0f} seconds')
+    except Exception as e:
+        logger.error(f"Error in handle_unlock: {e}")
 
 
 @app.action("restartApp", matchers=[authed_action])
-async def handle_restart_app(ack, body, logger):
-    # Acknowledge the action
-    await ack()
-    logger.debug("app.action 'handle_restart_app':" + str(body))
+async def handle_restart_app(ack, body, logger, client):
+    try:
+        # Acknowledge the action
+        await ack()
 
-    blink.set_colour_name('fuchsia')  # light purple
+        # Set the spinning face going on the button
+        await set_loading_icon_on_button(body=body, client=client, logger=logger)
 
-    # Logs about restart
-    msg = f"Admin '{get_user_name(body)}' has asked the doorbot app to restart"
-    logger.warning(msg)
-    await post_slack_door(msg)
+        logger.debug("app.action 'handle_restart_app':" + str(body))
 
-    # Give log messages a chance to flush out
-    await asyncio.sleep(1)
+        blink.set_colour_name('fuchsia')  # light purple
 
-    blink.set_colour_name('navy')  # dark blue
+        # Logs about restart
+        msg = f"Admin '{get_user_name(body)}' has asked the doorbot app to restart"
+        logger.warning(msg)
+        await post_slack_door(msg)
+
+        # Give log messages a chance to flush out
+        await asyncio.sleep(1)
+
+        blink.set_colour_name('navy')  # dark blue
+    except Exception as e:
+        logger.error(f"Error in handle_restart_app: {e}")
 
     # Restart the app by exiting and letting systemd restart us
     sys.exit()
 
 
 @app.action("rebootPi", matchers=[authed_action])
-async def handle_reboot_pi(ack, body, logger):
-    # Acknowledge the action
-    await ack()
-    logger.debug("app.action 'handle_restart_app':" + str(body))
+async def handle_reboot_pi(ack, body, logger, client):
+    try:
+        # Acknowledge the action
+        await ack()
 
-    blink.set_colour_name('purple')
+        # Set the spinning face going on the button
+        await set_loading_icon_on_button(body=body, client=client, logger=logger)
 
-    # Logs about restart
-    msg = f"Admin '{get_user_name(body)}' has asked the raspberry pi to reboot"
-    logger.warning(msg)
-    await post_slack_door(msg)
+        logger.debug("app.action 'handle_restart_app':" + str(body))
 
-    # Give log messages a chance to flush out
-    await asyncio.sleep(1)
+        blink.set_colour_name('purple')
 
-    blink.set_colour_name('navy')  # dark blue
+        # Logs about restart
+        msg = f"Admin '{get_user_name(body)}' has asked the raspberry pi to reboot"
+        logger.warning(msg)
+        await post_slack_door(msg)
 
-    # Reboot the Raspberry Pi
-    os.system('sudo reboot')
+        # Give log messages a chance to flush out
+        await asyncio.sleep(1)
+
+        blink.set_colour_name('navy')  # dark blue
+
+    except Exception as e:
+        logger.error(f"Error in handle_restart_app: {e}")
+
+        # Reboot the Raspberry Pi
+        os.system('sudo reboot')
 
 
 @app.action("livelinessCheck", matchers=[authed_action])
-async def handle_liveliness_check(ack, body, logger):
-    # Acknowledge the action
-    await ack()
-    logger.debug("app.action 'handle_liveliness_check':" + str(body))
+async def handle_liveliness_check(ack, body, logger, client):
+    try:
+        # Acknowledge the action
+        await ack()
 
-    # Briefly show a dimmer white
-    blink.set_colour_name('gray')
-    timer_blinkstick_white.set_wait_time(duration_s=1)
+        # Set the spinning face going on the button
+        await set_loading_icon_on_button(body=body, client=client, logger=logger)
 
-    # Calculate uptime
-    uptime_seconds = time.monotonic() - start_time
-    days, remainder = divmod(uptime_seconds, 3600*24)
-    hours, _ = divmod(remainder, 3600)
+        logger.debug("app.action 'handle_liveliness_check':" + str(body))
 
-    # Log and post about the liveliness check
-    msg = f"Admin '{get_user_name(body)}' has requested liveliness check (uptime {int(days)}d {int(hours)}h)"
-    logger.info(msg)
-    await post_slack_door(msg)
+        # Briefly show a dimmer white
+        blink.set_colour_name('gray')
+        timer_blinkstick_white.set_wait_time(duration_s=1)
+
+        # Calculate uptime
+        uptime_seconds = time.monotonic() - start_time
+        days, remainder = divmod(uptime_seconds, 3600*24)
+        hours, _ = divmod(remainder, 3600)
+
+        # Log and post about the liveliness check
+        msg = f"Admin '{get_user_name(body)}' has requested liveliness check (uptime {int(days)}d {int(hours)}h)"
+        logger.info(msg)
+        await post_slack_door(msg)
+
+        await update_home_tab(client=client, event=event, logger=logger)
+    except Exception as e:
+        logger.error(f"Error in handle_restart_app: {e}")
 
 
 @app.action("updateKeys", matchers=[authed_action])
-async def handle_update_keys(ack, body, logger):
+async def handle_update_keys(ack, body, logger, client):
     # Acknowledge the action
     await ack()
+
+    # Set the spinning face going on the button
+    await set_loading_icon_on_button(body=body, client=client, logger=logger)
+
     logger.debug("app.action 'update_keys':" + str(body))
 
     # Queue key update
