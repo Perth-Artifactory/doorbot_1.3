@@ -644,7 +644,7 @@ async def input_reader():
             door_state = status[config.door_sensor_channel]
             if door_sensor_last_state is None or door_state != door_sensor_last_state:
                 door_sensor_last_state = door_state
-                door_status_string = {False: 'open', True: 'closed'}[door_state]
+                door_status_string = {False: 'on', True: 'off'}[door_state]
                 general_logger.info(f"Door closed sensor: {door_status_string}")
 
                 # Define payload and headers
