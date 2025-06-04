@@ -1,5 +1,5 @@
 """
-Manaage downloading, storing and authorising keys and sounds for each user.
+Manage downloading, storing and authorising keys and sounds for each user.
 """
 
 import os
