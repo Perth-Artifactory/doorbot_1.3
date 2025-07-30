@@ -1,8 +1,8 @@
 import argparse
 import time
-from doorbot.interfaces.tidyauth_client import TidyAuthClient
-from doorbot.interfaces.user_manager import UserManager
-from doorbot.interfaces.sound_player import SoundPlayer
+from src.interfaces.tidyauth_client import TidyAuthClient
+from src.interfaces.user_manager import UserManager
+from src.interfaces.sound_player import SoundPlayer
 
 import logging
 logging.basicConfig(level=logging.DEBUG)

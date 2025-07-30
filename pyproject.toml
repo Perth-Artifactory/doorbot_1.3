@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+addopts = [
+    "-ra --cov=src --cov-report=term-missing",
+    "--import-mode=importlib",
+]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+select = ["E", "F", "I", "B"]
+exclude = ["tests/fixtures", "__pycache__"]

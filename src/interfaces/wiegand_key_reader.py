@@ -5,7 +5,7 @@ Since the callback is probably coming from another thread, the keys and any erro
 are stored in global lists. The main application can read these out whenever convenient.
 """
 
-from doorbot.interfaces import wiegand
+from src.interfaces import wiegand
 
 singleton_key_reader = None
 

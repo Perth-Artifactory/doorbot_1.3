@@ -1,6 +1,6 @@
 import time
 import pigpio
-from doorbot.interfaces import doorbot_hat_gpio
+from src.interfaces import doorbot_hat_gpio
 
 def main():
     pi = pigpio.pi()

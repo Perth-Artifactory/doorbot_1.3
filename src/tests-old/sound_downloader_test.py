@@ -1,6 +1,6 @@
-from doorbot.interfaces.sound_downloader import SoundDownloader
-from doorbot.interfaces.tidyauth_client import TidyAuthClient
-from doorbot.interfaces.user_manager import UserManager
+from src.interfaces.sound_downloader import SoundDownloader
+from src.interfaces.tidyauth_client import TidyAuthClient
+from src.interfaces.user_manager import UserManager
 import time
 import logging
 logging.basicConfig(level=logging.DEBUG)

@@ -1,6 +1,6 @@
 import time
 import pigpio
-from doorbot.interfaces import wiegand_key_reader
+from src.interfaces import wiegand_key_reader
 
 reader = wiegand_key_reader.KeyReader(pigpio.pi())
 

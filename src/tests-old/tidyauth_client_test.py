@@ -1,7 +1,7 @@
 import asyncio
 
 import argparse
-from doorbot.interfaces.tidyauth_client import TidyAuthClient
+from src.interfaces.tidyauth_client import TidyAuthClient
 
 import logging
 logging.basicConfig(level=logging.DEBUG)

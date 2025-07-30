@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock, call
-from doorbot.interfaces.monotonic_waiter import MonotonicWaiter
+from src.interfaces.monotonic_waiter import MonotonicWaiter
 import asyncio
 
 class TestMonotonicWaiter(unittest.TestCase):

@@ -12,4 +12,4 @@ user_cache.json
 __pycache__/
 *.py[cod]
 *$py.class
-
+.pytest_cache/

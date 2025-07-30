@@ -7,8 +7,8 @@ from flask import Flask, request, jsonify
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from doorbot.interfaces.text_to_speech import non_blocking_speak
-from doorbot.interfaces.sound_player import SoundPlayer
+from src.interfaces.text_to_speech import non_blocking_speak
+from src.interfaces.sound_player import SoundPlayer
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()

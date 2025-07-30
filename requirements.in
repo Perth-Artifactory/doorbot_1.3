@@ -1,0 +1,10 @@
+slack-bolt
+aiohttp
+requests
+pigpio
+BlinkStick
+pyusb
+pyttsx3
+flask
+flask_httpauth
+python-vlc

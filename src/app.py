@@ -18,16 +18,16 @@ import re
 import os
 import requests
 
-from doorbot.interfaces import slack_blocks
-from doorbot.interfaces.doorbot_hat_gpio import DoorbotHatGpio
-from doorbot.interfaces.wiegand_key_reader import KeyReader
-from doorbot.interfaces.blinkstick_interface import BlinkstickInterface
-from doorbot.interfaces.tidyauth_client import TidyAuthClient
-from doorbot.interfaces.user_manager import UserManager
-from doorbot.interfaces.sound_downloader import SoundDownloader
-from doorbot.interfaces.sound_player import SoundPlayer
-from doorbot.interfaces.monotonic_waiter import MonotonicWaiter
-from doorbot.interfaces import text_to_speech
+from src.interfaces import slack_blocks
+from src.interfaces.doorbot_hat_gpio import DoorbotHatGpio
+from src.interfaces.wiegand_key_reader import KeyReader
+from src.interfaces.blinkstick_interface import BlinkstickInterface
+from src.interfaces.tidyauth_client import TidyAuthClient
+from src.interfaces.user_manager import UserManager
+from src.interfaces.sound_downloader import SoundDownloader
+from src.interfaces.sound_player import SoundPlayer
+from src.interfaces.monotonic_waiter import MonotonicWaiter
+from src.interfaces import text_to_speech
 
 # ======= Logging =======
 
