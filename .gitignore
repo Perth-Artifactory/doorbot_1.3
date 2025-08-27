@@ -6,6 +6,7 @@ data/
 config.json
 user_cache.json
 *.log*
+sounds/custom/*
 
 # ____ Generic Python ignores _____
 # Byte-compiled / optimized / DLL files
