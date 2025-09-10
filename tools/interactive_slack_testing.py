@@ -7,7 +7,7 @@ then imports and uses the actual Slack handlers from app.py.
 
 NO CHANGES TO APP.PY REQUIRED!
 
-Usage: python slack_testing_reuse.py
+Usage: python tools/interactive_slack_testing.py
 """
 
 import sys
@@ -152,8 +152,8 @@ logger.info("✅ All hardware interfaces mocked successfully!")
 
 logger.info("📦 Importing doorbot.app with mocked dependencies...")
 
-# Add current directory to path so we can import doorbot
-sys.path.insert(0, '/home/tazard/doorbot_1.3')
+# Add parent directory to path so we can import doorbot
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     from doorbot import app

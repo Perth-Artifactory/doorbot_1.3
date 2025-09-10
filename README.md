@@ -146,7 +146,7 @@ For manual testing of Slack functionality with real handlers but mock hardware:
 
 ```bash
 # Run the interactive testing script
-python slack_testing_reuse.py
+python tools/interactive_slack_testing.py
 ```
 
 This script:
@@ -155,6 +155,14 @@ This script:
 - Mocks all hardware interfaces (GPIO, BlinkStick, etc.)
 - Connects to Slack Socket Mode for real-time testing
 - Logs hardware actions without executing them
+
+### Development Tools
+
+The project includes several development and testing utilities:
+
+- **`tools/interactive_slack_testing.py`**: Interactive testing with real Slack handlers and mock hardware
+- **`experiments/tools/`**: Various utility scripts for development (card conversion, manual unlock, etc.)
+- **`experiments/`**: Development experiments and prototypes for new features
 
 ### Test Coverage
 
