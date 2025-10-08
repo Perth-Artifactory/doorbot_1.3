@@ -1,5 +1,13 @@
 """
 Tests for Slack app functionality, focusing on the spinning icon/loading button feature.
+
+This test suite imports the REAL functions from app.py by mocking hardware dependencies first.
+This ensures tests stay synchronized with the actual implementation - no copy/paste code duplication!
+
+The mocking approach is borrowed from tools/interactive_slack_testing.py:
+1. Mock hardware modules BEFORE importing app.py
+2. Import the actual functions from app.py 
+3. Test the real implementation with mocked dependencies
 """
 
 import pytest
@@ -10,114 +18,110 @@ import json
 import sys
 import os
 
-# Add the parent directory to the path for imports
+# ===== STEP 1: MOCK HARDWARE DEPENDENCIES BEFORE IMPORTING APP =====
+
+# Mock all the hardware modules BEFORE importing app.py
+class MockPigpio:
+    def pi(self):
+        return MockPi()
+
+class MockPi:
+    def __init__(self):
+        self.connected = True
+    def stop(self):
+        pass
+
+class MockDoorbotHatGpio:
+    def __init__(self, pi):
+        self.relay_state = {}
+    def set_relay(self, channel, state):
+        self.relay_state[channel] = state
+    def read_switches(self):
+        return {0: False, 1: False}
+
+class MockKeyReader:
+    def __init__(self, pi):
+        pass
+    def start_reading(self):
+        pass
+    def stop_reading(self):
+        pass
+
+class MockBlinkstickInterface:
+    def __init__(self):
+        self.color = "blue"
+    def set_colour_name(self, color):
+        self.color = color
+    def set_white(self):
+        self.set_colour_name("white")
+
+class MockTidyAuthClient:
+    def __init__(self, base_url, token):
+        pass
+
+class MockUserManager:
+    def __init__(self, api_client, cache_path):
+        pass
+    async def download_keys(self):
+        return True
+    def key_count(self):
+        return 42
+
+class MockSoundDownloader:
+    def __init__(self, users_with_custom_sounds, download_directory):
+        pass
+    def download_next_sound(self):
+        return False
+
+class MockSoundPlayer:
+    def __init__(self, sound_dir, custom_sound_dir):
+        pass
+    def play_sound(self, sound_name):
+        pass
+
+class MockMonotonicWaiter:
+    def __init__(self, name):
+        self.name = name
+        self._duration = 0
+    def set_wait_time(self, duration_s):
+        self._duration = duration_s
+    async def wait(self):
+        if self._duration > 0:
+            self._duration = 0
+            return True
+        await asyncio.sleep(0.1)
+        return False
+
+class MockTextToSpeech:
+    def non_blocking_speak(self, text):
+        pass
+
+# Create mock modules
+mock_tts_module = Mock()
+mock_tts_module.non_blocking_speak = MockTextToSpeech().non_blocking_speak
+
+# Inject mocks into sys.modules BEFORE importing
+sys.modules['pigpio'] = MockPigpio()
+sys.modules['doorbot.interfaces.doorbot_hat_gpio'] = Mock(DoorbotHatGpio=MockDoorbotHatGpio)
+sys.modules['doorbot.interfaces.wiegand_key_reader'] = Mock(KeyReader=MockKeyReader)
+sys.modules['doorbot.interfaces.blinkstick_interface'] = Mock(BlinkstickInterface=MockBlinkstickInterface)
+sys.modules['doorbot.interfaces.tidyauth_client'] = Mock(TidyAuthClient=MockTidyAuthClient)
+sys.modules['doorbot.interfaces.user_manager'] = Mock(UserManager=MockUserManager)
+sys.modules['doorbot.interfaces.sound_downloader'] = Mock(SoundDownloader=MockSoundDownloader)
+sys.modules['doorbot.interfaces.sound_player'] = Mock(SoundPlayer=MockSoundPlayer)
+sys.modules['doorbot.interfaces.monotonic_waiter'] = Mock(MonotonicWaiter=MockMonotonicWaiter)
+sys.modules['doorbot.interfaces.text_to_speech'] = mock_tts_module
+
+# ===== STEP 2: NOW IMPORT APP.PY AND GET THE REAL FUNCTIONS =====
+
+# Add parent directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-# Import slack_blocks directly (it doesn't have dependencies)
+# Import the REAL functions from app.py
+from doorbot.app import patch_home_blocks, set_loading_icon_on_button, reset_button_after_action
+
+# Import slack_blocks for testing
 from doorbot.interfaces import slack_blocks
-
-# Import individual functions we want to test by copying them
-def patch_home_blocks(blocks, block_id, action_id, appended_text=None, replacement_text=None, style=None):
-    """Patch blocks for home view buttons with loading indicators or updates"""
-    new_blocks = copy.deepcopy(blocks)
-    
-    for block in new_blocks:
-        if block.get("block_id") == block_id:
-            # Handle different block types
-            if "elements" in block:
-                for element in block["elements"]:
-                    if element.get("action_id") == action_id:
-                        if replacement_text:
-                            element["text"]["text"] = replacement_text
-                        elif appended_text:
-                            # Remove any existing loading indicator first
-                            current_text = element["text"]["text"]
-                            if " :spinthinking:" in current_text:
-                                current_text = current_text.replace(" :spinthinking:", "")
-                            element["text"]["text"] = current_text + appended_text
-                        
-                        if style:
-                            element["style"] = style
-            elif "accessory" in block and block["accessory"].get("action_id") == action_id:
-                # Handle section blocks with accessory buttons
-                if replacement_text:
-                    block["accessory"]["text"]["text"] = replacement_text
-                elif appended_text:
-                    current_text = block["accessory"]["text"]["text"]
-                    if " :spinthinking:" in current_text:
-                        current_text = current_text.replace(" :spinthinking:", "")
-                    block["accessory"]["text"]["text"] = current_text + appended_text
-                
-                if style:
-                    block["accessory"]["style"] = style
-    
-    return new_blocks
-
-
-async def set_loading_icon_on_button(body, client, logger):
-    """Set the spinning icon on the button for home view"""
-    try:
-        from slack_sdk.errors import SlackApiError
-        
-        # Get the action that was clicked
-        action = body["actions"][0]
-        
-        # Patch the blocks with loading indicator
-        new_blocks = patch_home_blocks(
-            blocks=body["view"]["blocks"],
-            block_id=action.get("block_id"),
-            action_id=action["action_id"],
-            appended_text=" :spinthinking:"
-        )
-        
-        # Update the home view
-        await client.views_publish(
-            user_id=body["user"]["id"],
-            view={
-                "type": "home",
-                "blocks": new_blocks,
-            }
-        )
-        logger.info("Loading indicator added to button")
-    except Exception as e:
-        logger.error(f"Failed to update home view: {e}")
-
-
-async def reset_button_after_action(body, client, logger, success_text=None, delay_seconds=3):
-    """Reset button to original state after an action completes"""
-    try:
-        # Get the action that was clicked
-        action = body["actions"][0]
-        
-        if success_text:
-            # First show success message
-            new_blocks = patch_home_blocks(
-                blocks=body["view"]["blocks"],
-                block_id=action.get("block_id"),
-                action_id=action["action_id"],
-                replacement_text=success_text,
-                style="primary"
-            )
-            
-            await client.views_publish(
-                user_id=body["user"]["id"],
-                view={
-                    "type": "home",
-                    "blocks": new_blocks,
-                }
-            )
-            
-            # Wait a bit before resetting
-            await asyncio.sleep(delay_seconds)
-        
-        # Reset to original home view
-        await client.views_publish(
-            user_id=body["user"]["id"],
-            view=slack_blocks.home_view
-        )
-        logger.info("Button reset to original state")
-    except Exception as e:
-        logger.error(f"Unexpected error resetting button: {e}")
 
 
 class TestSlackLoadingButtons:
