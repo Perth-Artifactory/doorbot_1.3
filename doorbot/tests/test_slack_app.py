@@ -4,7 +4,7 @@ Tests for Slack app functionality, focusing on the spinning icon/loading button 
 This test suite imports the REAL functions from app.py by mocking hardware dependencies first.
 This ensures tests stay synchronized with the actual implementation - no copy/paste code duplication!
 
-The mocking approach is borrowed from tools/interactive_slack_testing.py:
+The mocking approach (defined in conftest.py):
 1. Mock hardware modules BEFORE importing app.py
 2. Import the actual functions from app.py 
 3. Test the real implementation with mocked dependencies
@@ -12,108 +12,13 @@ The mocking approach is borrowed from tools/interactive_slack_testing.py:
 
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
+from unittest.mock import AsyncMock, MagicMock, patch
 import copy
 import json
 import sys
 import os
 
-# ===== STEP 1: MOCK HARDWARE DEPENDENCIES BEFORE IMPORTING APP =====
-
-# Mock all the hardware modules BEFORE importing app.py
-class MockPigpio:
-    def pi(self):
-        return MockPi()
-
-class MockPi:
-    def __init__(self):
-        self.connected = True
-    def stop(self):
-        pass
-
-class MockDoorbotHatGpio:
-    def __init__(self, pi):
-        self.relay_state = {}
-    def set_relay(self, channel, state):
-        self.relay_state[channel] = state
-    def read_switches(self):
-        return {0: False, 1: False}
-
-class MockKeyReader:
-    def __init__(self, pi):
-        pass
-    def start_reading(self):
-        pass
-    def stop_reading(self):
-        pass
-
-class MockBlinkstickInterface:
-    def __init__(self):
-        self.color = "blue"
-    def set_colour_name(self, color):
-        self.color = color
-    def set_white(self):
-        self.set_colour_name("white")
-
-class MockTidyAuthClient:
-    def __init__(self, base_url, token):
-        pass
-
-class MockUserManager:
-    def __init__(self, api_client, cache_path):
-        pass
-    async def download_keys(self):
-        return True
-    def key_count(self):
-        return 42
-
-class MockSoundDownloader:
-    def __init__(self, users_with_custom_sounds, download_directory):
-        pass
-    def download_next_sound(self):
-        return False
-
-class MockSoundPlayer:
-    def __init__(self, sound_dir, custom_sound_dir):
-        pass
-    def play_sound(self, sound_name):
-        pass
-
-class MockMonotonicWaiter:
-    def __init__(self, name):
-        self.name = name
-        self._duration = 0
-    def set_wait_time(self, duration_s):
-        self._duration = duration_s
-    async def wait(self):
-        if self._duration > 0:
-            self._duration = 0
-            return True
-        await asyncio.sleep(0.1)
-        return False
-
-class MockTextToSpeech:
-    def non_blocking_speak(self, text):
-        pass
-
-# Create mock modules
-mock_tts_module = Mock()
-mock_tts_module.non_blocking_speak = MockTextToSpeech().non_blocking_speak
-
-# Inject mocks into sys.modules BEFORE importing
-sys.modules['pigpio'] = MockPigpio()
-sys.modules['doorbot.interfaces.doorbot_hat_gpio'] = Mock(DoorbotHatGpio=MockDoorbotHatGpio)
-sys.modules['doorbot.interfaces.wiegand_key_reader'] = Mock(KeyReader=MockKeyReader)
-sys.modules['doorbot.interfaces.blinkstick_interface'] = Mock(BlinkstickInterface=MockBlinkstickInterface)
-sys.modules['doorbot.interfaces.tidyauth_client'] = Mock(TidyAuthClient=MockTidyAuthClient)
-sys.modules['doorbot.interfaces.user_manager'] = Mock(UserManager=MockUserManager)
-sys.modules['doorbot.interfaces.sound_downloader'] = Mock(SoundDownloader=MockSoundDownloader)
-sys.modules['doorbot.interfaces.sound_player'] = Mock(SoundPlayer=MockSoundPlayer)
-sys.modules['doorbot.interfaces.monotonic_waiter'] = Mock(MonotonicWaiter=MockMonotonicWaiter)
-sys.modules['doorbot.interfaces.text_to_speech'] = mock_tts_module
-
-# ===== STEP 2: NOW IMPORT APP.PY AND GET THE REAL FUNCTIONS =====
-
+# Hardware mocks are automatically installed by conftest.py
 # Add parent directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 

@@ -2,6 +2,14 @@
 Integration tests for Slack app functionality.
 These tests require real Slack tokens and should be run manually.
 
+This test suite imports the REAL functions from app.py by mocking hardware dependencies first.
+This ensures integration tests validate the actual implementation, not a copy.
+
+The mocking approach (defined in conftest.py):
+1. Mock hardware modules BEFORE importing app.py
+2. Import the actual functions from app.py
+3. Test the real implementation with mocked dependencies
+
 To run these tests, set the following environment variables:
 - SLACK_BOT_TOKEN: Your Slack bot token
 - SLACK_APP_TOKEN: Your Slack app token (for socket mode)
@@ -21,114 +29,17 @@ from unittest.mock import MagicMock
 from slack_bolt.app.async_app import AsyncApp
 from slack_sdk.errors import SlackApiError
 import copy
-
-# Import slack_blocks directly
-from doorbot.interfaces import slack_blocks
-
-# Import the functions to test
 import sys
+
+# Hardware mocks are automatically installed by conftest.py
+# Add parent directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-# Copy the functions we want to test (to avoid import issues)
-def patch_home_blocks(blocks, block_id, action_id, appended_text=None, replacement_text=None, style=None):
-    """Patch blocks for home view buttons with loading indicators or updates"""
-    new_blocks = copy.deepcopy(blocks)
-    
-    for block in new_blocks:
-        if block.get("block_id") == block_id:
-            # Handle different block types
-            if "elements" in block:
-                for element in block["elements"]:
-                    if element.get("action_id") == action_id:
-                        if replacement_text:
-                            element["text"]["text"] = replacement_text
-                        elif appended_text:
-                            # Remove any existing loading indicator first
-                            current_text = element["text"]["text"]
-                            if " :spinthinking:" in current_text:
-                                current_text = current_text.replace(" :spinthinking:", "")
-                            element["text"]["text"] = current_text + appended_text
-                        
-                        if style:
-                            element["style"] = style
-            elif "accessory" in block and block["accessory"].get("action_id") == action_id:
-                # Handle section blocks with accessory buttons
-                if replacement_text:
-                    block["accessory"]["text"]["text"] = replacement_text
-                elif appended_text:
-                    current_text = block["accessory"]["text"]["text"]
-                    if " :spinthinking:" in current_text:
-                        current_text = current_text.replace(" :spinthinking:", "")
-                    block["accessory"]["text"]["text"] = current_text + appended_text
-                
-                if style:
-                    block["accessory"]["style"] = style
-    
-    return new_blocks
+# Import the REAL functions from app.py
+from doorbot.app import patch_home_blocks, set_loading_icon_on_button, reset_button_after_action
 
-
-async def set_loading_icon_on_button(body, client, logger):
-    """Set the spinning icon on the button for home view"""
-    try:
-        # Get the action that was clicked
-        action = body["actions"][0]
-        
-        # Patch the blocks with loading indicator
-        new_blocks = patch_home_blocks(
-            blocks=body["view"]["blocks"],
-            block_id=action.get("block_id"),
-            action_id=action["action_id"],
-            appended_text=" :spinthinking:"
-        )
-        
-        # Update the home view
-        await client.views_publish(
-            user_id=body["user"]["id"],
-            view={
-                "type": "home",
-                "blocks": new_blocks,
-            }
-        )
-        logger.info("Loading indicator added to button")
-    except SlackApiError as e:
-        logger.error(f"Failed to update home view: {e.response['error']}")
-
-
-async def reset_button_after_action(body, client, logger, success_text=None, delay_seconds=3):
-    """Reset button to original state after an action completes"""
-    try:
-        # Get the action that was clicked
-        action = body["actions"][0]
-        
-        if success_text:
-            # First show success message
-            new_blocks = patch_home_blocks(
-                blocks=body["view"]["blocks"],
-                block_id=action.get("block_id"),
-                action_id=action["action_id"],
-                replacement_text=success_text,
-                style="primary"
-            )
-            
-            await client.views_publish(
-                user_id=body["user"]["id"],
-                view={
-                    "type": "home",
-                    "blocks": new_blocks,
-                }
-            )
-            
-            # Wait a bit before resetting
-            await asyncio.sleep(delay_seconds)
-        
-        # Reset to original home view
-        await client.views_publish(
-            user_id=body["user"]["id"],
-            view=slack_blocks.home_view
-        )
-        logger.info("Button reset to original state")
-    except Exception as e:
-        logger.error(f"Unexpected error resetting button: {e}")
+# Import slack_blocks for testing
+from doorbot.interfaces import slack_blocks
 
 
 @pytest.mark.integration

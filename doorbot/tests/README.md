@@ -4,6 +4,21 @@ This directory contains tests for the Doorbot application, with a focus on the S
 
 ## Test Files
 
+### `conftest.py`
+
+Shared test configuration and fixtures. This file:
+
+- Provides mock hardware classes for all test files to use
+- Automatically installs mocks into `sys.modules` before any tests run
+- Eliminates code duplication between test files
+- Ensures consistent mocking strategy across all tests
+
+The mocking approach (borrowed from `tools/interactive_slack_testing.py`):
+
+1. Mock all hardware modules BEFORE importing app.py
+2. Import the actual functions from app.py
+3. Test the real implementation with mocked dependencies
+
 ### `test_slack_app.py`
 
 Unit tests for the Slack loading button functionality. These tests:
@@ -12,7 +27,8 @@ Unit tests for the Slack loading button functionality. These tests:
 - Test the `set_loading_icon_on_button` function that shows spinning icons
 - Test the `reset_button_after_action` function that shows success and resets buttons
 - Validate the structure of Slack blocks
-- Mock all external dependencies, so they run without requiring real Slack tokens
+- Mock all external dependencies via `conftest.py`, so they run without requiring real Slack tokens
+- Import and test the REAL functions from `doorbot.app` (no code duplication!)
 
 ### `test_slack_integration.py`
 
@@ -21,6 +37,8 @@ Integration tests that require real Slack tokens. These tests:
 - Actually call the Slack API to test the loading button flow
 - Require environment variables: `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `TEST_USER_ID`
 - Should be run manually when you want to test against a real Slack workspace
+- Use hardware mocks from `conftest.py` but real Slack API calls
+- Import and test the REAL functions from `doorbot.app` (no code duplication!)
 
 ## Running Tests
 
