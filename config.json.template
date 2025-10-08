@@ -17,5 +17,6 @@
     "custom_sounds_dir": "/home/pi/doorbot_1.3/data/custom_sounds",
     "log_path": "/home/pi/doorbot_1.3/data/doorbot.log",
     "access_granted_webhook": "http://ha:8123/api/webhook/xxx",
-    "door_sensor_webhook": "http://ha:8123/api/webhook/xxxx"
+    "door_sensor_ha_api_url": "http://ha:8123/api/states/binary_sensor.front_door",
+    "home_assistant_token": ""
 }

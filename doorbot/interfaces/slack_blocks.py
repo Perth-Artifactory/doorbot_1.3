@@ -13,6 +13,7 @@ home_view = {
     [
         {
             "type": "actions",
+            "block_id": "message_actions",
             "elements":
             [
                 {
@@ -69,6 +70,7 @@ home_view = {
         {
             "dispatch_action": True,
             "type": "input",
+            "block_id": "tts_input",
             "element": {
                 "type": "plain_text_input",
                 "action_id": "ttsMessage"
@@ -84,6 +86,7 @@ home_view = {
         },
         {
             "type": "section",
+            "block_id": "unlock_section",
             "text": {
                 "type": "mrkdwn",
                 "text": "Manually unlock the door, a sound notification will be played automatically"
@@ -112,6 +115,7 @@ home_view = {
         # - Rebooting Raspberry Pi
         {
             "type": "actions",
+            "block_id": "admin_actions",
             "elements":
             [
                 {

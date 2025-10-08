@@ -12,11 +12,13 @@ from logging.handlers import RotatingFileHandler
 import json
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.app.async_app import AsyncApp
+from slack_sdk.errors import SlackApiError
 import asyncio
 import pigpio
 import re
 import os
 import requests
+import copy
 
 from doorbot.interfaces import slack_blocks
 from doorbot.interfaces.doorbot_hat_gpio import DoorbotHatGpio
@@ -225,6 +227,111 @@ async def post_slack_log(message):
     )
 
 
+def patch_home_blocks(blocks, block_id, action_id, appended_text=None, replacement_text=None, style=None):
+    """Patch blocks for home view buttons with loading indicators or updates"""
+    new_blocks = copy.deepcopy(blocks)
+    
+    for block in new_blocks:
+        if block.get("block_id") == block_id:
+            # Handle different block types
+            if "elements" in block:
+                for element in block["elements"]:
+                    if element.get("action_id") == action_id:
+                        if replacement_text:
+                            element["text"]["text"] = replacement_text
+                        elif appended_text:
+                            # Remove any existing loading indicator first
+                            current_text = element["text"]["text"]
+                            if " :spinthinking:" in current_text:
+                                current_text = current_text.replace(" :spinthinking:", "")
+                            element["text"]["text"] = current_text + appended_text
+                        
+                        if style:
+                            element["style"] = style
+            elif "accessory" in block and block["accessory"].get("action_id") == action_id:
+                # Handle section blocks with accessory buttons
+                if replacement_text:
+                    block["accessory"]["text"]["text"] = replacement_text
+                elif appended_text:
+                    current_text = block["accessory"]["text"]["text"]
+                    if " :spinthinking:" in current_text:
+                        current_text = current_text.replace(" :spinthinking:", "")
+                    block["accessory"]["text"]["text"] = current_text + appended_text
+                
+                if style:
+                    block["accessory"]["style"] = style
+    
+    return new_blocks
+
+
+async def set_loading_icon_on_button(body, client, logger):
+    """Set the spinning icon on the button for home view"""
+    try:
+        # Get the action that was clicked
+        action = body["actions"][0]
+        
+        # Patch the blocks with loading indicator
+        new_blocks = patch_home_blocks(
+            blocks=body["view"]["blocks"],
+            block_id=action.get("block_id"),
+            action_id=action["action_id"],
+            appended_text=" :spinthinking:"
+        )
+        
+        # Update the home view
+        await client.views_publish(
+            user_id=body["user"]["id"],
+            view={
+                "type": "home",
+                "blocks": new_blocks,
+            }
+        )
+        logger.info("Loading indicator added to button")
+    except SlackApiError as e:
+        logger.error(f"Failed to update home view: {e.response['error']}")
+        if "response_metadata" in e.response and "messages" in e.response["response_metadata"]:
+            logger.error(e.response["response_metadata"]["messages"])
+
+
+async def reset_button_after_action(body, client, logger, success_text=None, delay_seconds=3):
+    """Reset button to original state after an action completes"""
+    try:
+        # Get the action that was clicked
+        action = body["actions"][0]
+        
+        if success_text:
+            # First show success message
+            new_blocks = patch_home_blocks(
+                blocks=body["view"]["blocks"],
+                block_id=action.get("block_id"),
+                action_id=action["action_id"],
+                replacement_text=success_text,
+                style="primary"
+            )
+            
+            await client.views_publish(
+                user_id=body["user"]["id"],
+                view={
+                    "type": "home",
+                    "blocks": new_blocks,
+                }
+            )
+            
+            # Wait a bit before resetting
+            await asyncio.sleep(delay_seconds)
+        
+        # Reset to original home view
+        await client.views_publish(
+            user_id=body["user"]["id"],
+            view=slack_blocks.home_view
+        )
+        logger.info("Button reset to original state")
+    except SlackApiError as e:
+        logger.error(f"Failed to reset button: {e.response['error']}")
+    except Exception as e:
+        logger.error(f"Unexpected error resetting button: {e}")
+
+
 # ======== Slack Matchers ==========
 
 async def check_user_authed(user_id):
@@ -306,121 +413,195 @@ async def update_home_tab(client, event, logger):
 
 @app.action("sendMessage", matchers=[authed_action])
 async def handle_send_message(ack, body, logger):
-    await ack()
-    logger.debug("app.action 'sendMessage':" + str(body))
-    text = get_response_text(body)
-    text_to_speech.non_blocking_speak(text)
-    logger.info(f"SEND MESSAGE = {text}")
-    await post_slack_door(f"Admin '{get_user_name(body)}' played predefined text-to-speech: {text}")
+    try:
+        await ack()
+        logger.debug("app.action 'sendMessage':" + str(body))
+        text = get_response_text(body)
+        text_to_speech.non_blocking_speak(text)
+        logger.info(f"SEND MESSAGE = {text}")
+        await post_slack_door(f"Admin '{get_user_name(body)}' played predefined text-to-speech: {text}")
+    except Exception as e:
+        logger.error(f"Error in handle_send_message: {e}")
 
 
 @app.action("ttsMessage", matchers=[authed_action])
 async def handle_tts_message(ack, body, logger):
-    await ack()
-    logger.debug("app.action 'ttsMessage':" + str(body))
-    text = get_response_value(body)
-    text_to_speech.non_blocking_speak(text)
-    logger.info(f"TTS MESSAGE = {text}")
-    await post_slack_door(f"Admin '{get_user_name(body)}' played text-to-speech: {text}")
+    try:
+        await ack()
+        logger.debug("app.action 'ttsMessage':" + str(body))
+        text = get_response_value(body)
+        text_to_speech.non_blocking_speak(text)
+        logger.info(f"TTS MESSAGE = {text}")
+        await post_slack_door(f"Admin '{get_user_name(body)}' played text-to-speech: {text}")
+    except Exception as e:
+        logger.error(f"Error in handle_tts_message: {e}")
 
 
 @app.action("unlock", matchers=[authed_action])
-async def handle_unlock(ack, body, logger):
-    await ack()
-    logger.debug("app.action 'unlock':" + str(body))
-    value = get_response_value(body)
+async def handle_unlock(ack, body, logger, client):
     try:
-        time_s = float(value)
-    except ValueError:
-        logger.error("Invalid wait time: " + value)
-    else:
-        # Valid time
-        msg = f"Admin '{get_user_name(body)}' manually opened door for {time_s:.0f} seconds"
-        gpio_unlock(time_s)
-        logger.info(msg)
-        await post_slack_door(msg)
-        text_to_speech.non_blocking_speak(
-            f'Door has been opened for {time_s:.0f} seconds')
+        await ack()
+
+        # Set the spinning face going on the button
+        await set_loading_icon_on_button(body=body, client=client, logger=logger)
+
+        logger.debug("app.action 'unlock':" + str(body))
+        value = get_response_value(body)
+        try:
+            time_s = float(value)
+        except ValueError:
+            logger.error("Invalid wait time: " + value)
+            # Reset button on error
+            await reset_button_after_action(body=body, client=client, logger=logger)
+        else:
+            # Valid time
+            msg = f"Admin '{get_user_name(body)}' manually opened door for {time_s:.0f} seconds"
+            gpio_unlock(time_s)
+            logger.info(msg)
+            await post_slack_door(msg)
+            text_to_speech.non_blocking_speak(
+                f'Door has been opened for {time_s:.0f} seconds')
+            
+            # Reset button with success message
+            await reset_button_after_action(
+                body=body, 
+                client=client, 
+                logger=logger, 
+                success_text=f"Unlocked for {time_s:.0f}s! ✓"
+            )
+    except Exception as e:
+        logger.error(f"Error in handle_unlock: {e}")
+        # Reset button on error
+        await reset_button_after_action(body=body, client=client, logger=logger)
 
 
 @app.action("restartApp", matchers=[authed_action])
-async def handle_restart_app(ack, body, logger):
-    # Acknowledge the action
-    await ack()
-    logger.debug("app.action 'handle_restart_app':" + str(body))
+async def handle_restart_app(ack, body, logger, client):
+    try:
+        # Acknowledge the action
+        await ack()
 
-    blink.set_colour_name('fuchsia')  # light purple
+        # Set the spinning face going on the button
+        await set_loading_icon_on_button(body=body, client=client, logger=logger)
 
-    # Logs about restart
-    msg = f"Admin '{get_user_name(body)}' has asked the doorbot app to restart"
-    logger.warning(msg)
-    await post_slack_door(msg)
+        logger.debug("app.action 'handle_restart_app':" + str(body))
 
-    # Give log messages a chance to flush out
-    await asyncio.sleep(1)
+        blink.set_colour_name('fuchsia')  # light purple
 
-    blink.set_colour_name('navy')  # dark blue
+        # Logs about restart
+        msg = f"Admin '{get_user_name(body)}' has asked the doorbot app to restart"
+        logger.warning(msg)
+        await post_slack_door(msg)
+
+        # Give log messages a chance to flush out
+        await asyncio.sleep(1)
+
+        blink.set_colour_name('navy')  # dark blue
+    except Exception as e:
+        logger.error(f"Error in handle_restart_app: {e}")
 
     # Restart the app by exiting and letting systemd restart us
     sys.exit()
 
 
 @app.action("rebootPi", matchers=[authed_action])
-async def handle_reboot_pi(ack, body, logger):
-    # Acknowledge the action
-    await ack()
-    logger.debug("app.action 'handle_restart_app':" + str(body))
+async def handle_reboot_pi(ack, body, logger, client):
+    try:
+        # Acknowledge the action
+        await ack()
 
-    blink.set_colour_name('purple')
+        # Set the spinning face going on the button
+        await set_loading_icon_on_button(body=body, client=client, logger=logger)
 
-    # Logs about restart
-    msg = f"Admin '{get_user_name(body)}' has asked the raspberry pi to reboot"
-    logger.warning(msg)
-    await post_slack_door(msg)
+        logger.debug("app.action 'handle_restart_app':" + str(body))
 
-    # Give log messages a chance to flush out
-    await asyncio.sleep(1)
+        blink.set_colour_name('purple')
 
-    blink.set_colour_name('navy')  # dark blue
+        # Logs about restart
+        msg = f"Admin '{get_user_name(body)}' has asked the raspberry pi to reboot"
+        logger.warning(msg)
+        await post_slack_door(msg)
+
+        # Give log messages a chance to flush out
+        await asyncio.sleep(1)
+
+        blink.set_colour_name('navy')  # dark blue
+
+    except Exception as e:
+        logger.error(f"Error in handle_reboot_pi: {e}")
 
     # Reboot the Raspberry Pi
     os.system('sudo reboot')
 
 
 @app.action("livelinessCheck", matchers=[authed_action])
-async def handle_liveliness_check(ack, body, logger):
-    # Acknowledge the action
-    await ack()
-    logger.debug("app.action 'handle_liveliness_check':" + str(body))
+async def handle_liveliness_check(ack, body, logger, client):
+    try:
+        # Acknowledge the action
+        await ack()
 
-    # Briefly show a dimmer white
-    blink.set_colour_name('gray')
-    timer_blinkstick_white.set_wait_time(duration_s=1)
+        # Set the spinning face going on the button
+        await set_loading_icon_on_button(body=body, client=client, logger=logger)
 
-    # Calculate uptime
-    uptime_seconds = time.monotonic() - start_time
-    days, remainder = divmod(uptime_seconds, 3600*24)
-    hours, _ = divmod(remainder, 3600)
+        logger.debug("app.action 'handle_liveliness_check':" + str(body))
 
-    # Log and post about the liveliness check
-    msg = f"Admin '{get_user_name(body)}' has requested liveliness check (uptime {int(days)}d {int(hours)}h)"
-    logger.info(msg)
-    await post_slack_door(msg)
+        # Briefly show a dimmer white
+        blink.set_colour_name('gray')
+        timer_blinkstick_white.set_wait_time(duration_s=1)
+
+        # Calculate uptime
+        uptime_seconds = time.monotonic() - start_time
+        days, remainder = divmod(uptime_seconds, 3600*24)
+        hours, _ = divmod(remainder, 3600)
+
+        # Log and post about the liveliness check
+        msg = f"Admin '{get_user_name(body)}' has requested liveliness check (uptime {int(days)}d {int(hours)}h)"
+        logger.info(msg)
+        await post_slack_door(msg)
+
+        # Reset button with success message
+        await reset_button_after_action(
+            body=body, 
+            client=client, 
+            logger=logger, 
+            success_text=f"Alive! {int(days)}d {int(hours)}h ✓"
+        )
+    except Exception as e:
+        logger.error(f"Error in handle_liveliness_check: {e}")
+        # Reset button on error
+        await reset_button_after_action(body=body, client=client, logger=logger)
 
 
 @app.action("updateKeys", matchers=[authed_action])
-async def handle_update_keys(ack, body, logger):
-    # Acknowledge the action
-    await ack()
-    logger.debug("app.action 'update_keys':" + str(body))
+async def handle_update_keys(ack, body, logger, client):
+    try:
+        # Acknowledge the action
+        await ack()
 
-    # Queue key update
-    timer_keys_update.set_wait_time(duration_s=1)
+        # Set the spinning face going on the button
+        await set_loading_icon_on_button(body=body, client=client, logger=logger)
 
-    # Log and post about the key update
-    msg = f"Admin '{get_user_name(body)}' has requested keys update"
-    logger.info(msg)
-    await post_slack_door(msg)
+        logger.debug("app.action 'update_keys':" + str(body))
+
+        # Queue key update
+        timer_keys_update.set_wait_time(duration_s=1)
+
+        # Log and post about the key update
+        msg = f"Admin '{get_user_name(body)}' has requested keys update"
+        logger.info(msg)
+        await post_slack_door(msg)
+
+        # Reset button with success message
+        await reset_button_after_action(
+            body=body, 
+            client=client, 
+            logger=logger, 
+            success_text="Keys update queued! ✓"
+        )
+    except Exception as e:
+        logger.error(f"Error in handle_update_keys: {e}")
+        # Reset button on error
+        await reset_button_after_action(body=body, client=client, logger=logger)
 
 
 # ======= Background Tasks =======
@@ -544,6 +725,8 @@ async def relock_door():
             gpio_lock()
             await asyncio.sleep(5)
 
+        await asyncio.sleep(0.1)
+
 
 async def clear_blinkstick():
     """Worker coroutine to change blinkstick back to white after a delay"""
@@ -557,8 +740,9 @@ async def clear_blinkstick():
         except Exception as e:
             general_logger.error(
                 f"clear_blinkstick - An unexpected exception occurred: {e}")
-            gpio_lock()
             await asyncio.sleep(5)
+
+        await asyncio.sleep(0.1)
 
 
 async def update_keys():
@@ -604,6 +788,8 @@ async def update_keys():
             general_logger.error(
                 f"update_keys - An unexpected exception occurred: {e}")
             await asyncio.sleep(5)
+
+        await asyncio.sleep(0.1)
 
 
 async def download_sounds():
@@ -687,6 +873,7 @@ async def run():
 
     asyncio.ensure_future(read_tags())
     asyncio.ensure_future(relock_door())
+    asyncio.ensure_future(clear_blinkstick())
     asyncio.ensure_future(update_keys())
     asyncio.ensure_future(download_sounds())
     asyncio.ensure_future(slack_logs_worker())
