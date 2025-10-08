@@ -229,8 +229,6 @@ async def post_slack_log(message):
 
 def patch_home_blocks(blocks, block_id, action_id, appended_text=None, replacement_text=None, style=None):
     """Patch blocks for home view buttons with loading indicators or updates"""
-    import copy
-    
     new_blocks = copy.deepcopy(blocks)
     
     for block in new_blocks:
@@ -530,10 +528,10 @@ async def handle_reboot_pi(ack, body, logger, client):
         blink.set_colour_name('navy')  # dark blue
 
     except Exception as e:
-        logger.error(f"Error in handle_restart_app: {e}")
+        logger.error(f"Error in handle_reboot_pi: {e}")
 
-        # Reboot the Raspberry Pi
-        os.system('sudo reboot')
+    # Reboot the Raspberry Pi
+    os.system('sudo reboot')
 
 
 @app.action("livelinessCheck", matchers=[authed_action])

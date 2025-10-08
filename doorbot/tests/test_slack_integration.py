@@ -32,8 +32,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 # Copy the functions we want to test (to avoid import issues)
 def patch_home_blocks(blocks, block_id, action_id, appended_text=None, replacement_text=None, style=None):
     """Patch blocks for home view buttons with loading indicators or updates"""
-    import copy
-    
     new_blocks = copy.deepcopy(blocks)
     
     for block in new_blocks:

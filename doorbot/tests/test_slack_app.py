@@ -19,8 +19,6 @@ from doorbot.interfaces import slack_blocks
 # Import individual functions we want to test by copying them
 def patch_home_blocks(blocks, block_id, action_id, appended_text=None, replacement_text=None, style=None):
     """Patch blocks for home view buttons with loading indicators or updates"""
-    import copy
-    
     new_blocks = copy.deepcopy(blocks)
     
     for block in new_blocks:
