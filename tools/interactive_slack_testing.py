@@ -184,20 +184,9 @@ except Exception as e:
 
 logger.info("✅ App instances checked - no manual replacement needed!")
 
-# Override some functions to avoid real side effects
-original_post_slack_door = app.post_slack_door
-original_post_slack_log = app.post_slack_log
-
-async def mock_post_slack_door(message):
-    logger.info(f"📤 Mock Slack Door: {message}")
-
-async def mock_post_slack_log(message):
-    logger.info(f"📤 Mock Slack Log: {message}")
-
-app.post_slack_door = mock_post_slack_door
-app.post_slack_log = mock_post_slack_log
-
-logger.info("✅ App module patched with mocks!")
+# Note: post_slack_door and post_slack_log are NOT mocked
+# They will post to the real Slack channels configured in config.json
+logger.info("✅ Slack posting functions will use real Slack API!")
 
 # ===== STEP 4: RUN THE REAL APP WITH MOCKED DEPENDENCIES =====
 
@@ -222,6 +211,7 @@ async def run_testing_app():
     logger.info("🔗 Starting Socket Mode connection...")
     logger.info("🎯 Now you can test buttons in Slack - they use the REAL handlers!")
     logger.info("💡 All hardware actions will be logged but not executed")
+    logger.info("📤 Slack messages WILL be posted to the configured channels!")
     
     await handler.start_async()
 
