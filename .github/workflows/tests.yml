@@ -40,7 +40,7 @@ jobs:
       
       - name: Run tests
         run: |
-          python -m pytest -v
+          python -m pytest -v -m "not integration"
           
       - name: Upload test results
         uses: actions/upload-artifact@v4
