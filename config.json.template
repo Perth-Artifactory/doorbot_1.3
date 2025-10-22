@@ -1,7 +1,7 @@
 {
     "mock_raspberry_pi": false,
-    "SLACK_APP_TOKEN": "",
-    "SLACK_BOT_TOKEN": "",
+    "SLACK_APP_TOKEN": "xapp-test-token",
+    "SLACK_BOT_TOKEN": "xoxb-test-token",
     "slack_channel": "#doorbot-slack-test",
     "slack_channel_logs": "#doorbot-test-2",
     "admin_usergroup_handle": "doorbot-admins",
