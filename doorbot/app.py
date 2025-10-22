@@ -187,11 +187,12 @@ def gpio_lock():
 
 # ======= Slack Helper Methods =======
 
-def get_user_name(b):
+def get_user_at_id(b):
+    """Returns user id like <@{user_id}> so that slack will render to @username"""
     try:
-        return b['user']['name']
+        return f"<@{b['user']['id']}>"
     except KeyError as e:
-        general_logger.error(f'get_user_name exception: {e}')
+        general_logger.error(f'get_user_at_id exception: {e}')
         return "Unknown"
 
 
@@ -419,7 +420,7 @@ async def handle_send_message(ack, body, logger):
         text = get_response_text(body)
         text_to_speech.non_blocking_speak(text)
         logger.info(f"SEND MESSAGE = {text}")
-        await post_slack_door(f"Admin '{get_user_name(body)}' played predefined text-to-speech: {text}")
+        await post_slack_door(f"Admin {get_user_at_id(body)} played predefined text-to-speech: {text}")
     except Exception as e:
         logger.error(f"Error in handle_send_message: {e}")
 
@@ -432,7 +433,7 @@ async def handle_tts_message(ack, body, logger):
         text = get_response_value(body)
         text_to_speech.non_blocking_speak(text)
         logger.info(f"TTS MESSAGE = {text}")
-        await post_slack_door(f"Admin '{get_user_name(body)}' played text-to-speech: {text}")
+        await post_slack_door(f"Admin {get_user_at_id(body)} played text-to-speech: {text}")
     except Exception as e:
         logger.error(f"Error in handle_tts_message: {e}")
 
@@ -455,7 +456,7 @@ async def handle_unlock(ack, body, logger, client):
             await reset_button_after_action(body=body, client=client, logger=logger)
         else:
             # Valid time
-            msg = f"Admin '{get_user_name(body)}' manually opened door for {time_s:.0f} seconds"
+            msg = f"Admin {get_user_at_id(body)} manually opened door for {time_s:.0f} seconds"
             gpio_unlock(time_s)
             logger.info(msg)
             await post_slack_door(msg)
@@ -489,7 +490,7 @@ async def handle_restart_app(ack, body, logger, client):
         blink.set_colour_name('fuchsia')  # light purple
 
         # Logs about restart
-        msg = f"Admin '{get_user_name(body)}' has asked the doorbot app to restart"
+        msg = f"Admin {get_user_at_id(body)} has asked the doorbot app to restart"
         logger.warning(msg)
         await post_slack_door(msg)
 
@@ -518,7 +519,7 @@ async def handle_reboot_pi(ack, body, logger, client):
         blink.set_colour_name('purple')
 
         # Logs about restart
-        msg = f"Admin '{get_user_name(body)}' has asked the raspberry pi to reboot"
+        msg = f"Admin {get_user_at_id(body)} has asked the raspberry pi to reboot"
         logger.warning(msg)
         await post_slack_door(msg)
 
@@ -555,7 +556,7 @@ async def handle_liveliness_check(ack, body, logger, client):
         hours, _ = divmod(remainder, 3600)
 
         # Log and post about the liveliness check
-        msg = f"Admin '{get_user_name(body)}' has requested liveliness check (uptime {int(days)}d {int(hours)}h)"
+        msg = f"Admin {get_user_at_id(body)} has requested liveliness check (uptime {int(days)}d {int(hours)}h)"
         logger.info(msg)
         await post_slack_door(msg)
 
@@ -587,7 +588,7 @@ async def handle_update_keys(ack, body, logger, client):
         timer_keys_update.set_wait_time(duration_s=1)
 
         # Log and post about the key update
-        msg = f"Admin '{get_user_name(body)}' has requested keys update"
+        msg = f"Admin {get_user_at_id(body)} has requested keys update"
         logger.info(msg)
         await post_slack_door(msg)
 
