@@ -31,10 +31,13 @@ jobs:
           pip install pytest pytest-asyncio
           pip install -r requirements.txt
       
-      - name: Create config file for tests
+      - name: Prepare for tests
         run: |
+          # Copy template config to actual config
           cp config.json.template config.json
-          
+          # Create dir used in config
+          mkdir -p data
+      
       - name: Run tests
         run: |
           python -m pytest -v
