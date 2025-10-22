@@ -396,5 +396,88 @@ class TestSlackBlocksStructure:
                 assert "text" in element["text"]
 
 
+class TestSlackBlocksMetadata:
+    """Test suite for Slack blocks metadata functionality"""
+    
+    def test_door_access_includes_metadata(self):
+        """Test that door_access includes metadata field with event data"""
+        result = slack_blocks.door_access(
+            name="John Doe",
+            tag="1234567890",
+            status=":white_check_mark: Door unlocked",
+            level="Member"
+        )
+        
+        # Check that metadata field exists
+        assert 'metadata' in result, "door_access should include metadata field"
+        
+        # Check metadata structure
+        metadata = result['metadata']
+        assert 'event_type' in metadata, "metadata should include event_type"
+        assert 'event_payload' in metadata, "metadata should include event_payload"
+        
+        # Check event_type
+        assert metadata['event_type'] == 'door_access', "event_type should be 'door_access'"
+        
+        # Check event_payload contains all the data
+        payload = metadata['event_payload']
+        assert payload['name'] == "John Doe", "payload should include name"
+        assert payload['tag'] == "1234567890", "payload should include tag"
+        assert payload['status'] == ":white_check_mark: Door unlocked", "payload should include status"
+        assert payload['level'] == "Member", "payload should include level"
+    
+    def test_door_access_metadata_with_access_granted(self):
+        """Test door_access metadata with access granted scenario"""
+        result = slack_blocks.door_access(
+            name="Jane Smith",
+            tag="9876543210",
+            status=":white_check_mark: Door unlocked",
+            level="Admin"
+        )
+        
+        payload = result['metadata']['event_payload']
+        assert payload['name'] == "Jane Smith"
+        assert payload['tag'] == "9876543210"
+        assert payload['status'] == ":white_check_mark: Door unlocked"
+        assert payload['level'] == "Admin"
+    
+    def test_door_access_metadata_with_access_denied(self):
+        """Test door_access metadata with access denied scenario"""
+        result = slack_blocks.door_access(
+            name="Unknown",
+            tag="0000000000",
+            status=":x: Access denied",
+            level="Unknown"
+        )
+        
+        payload = result['metadata']['event_payload']
+        assert payload['name'] == "Unknown"
+        assert payload['tag'] == "0000000000"
+        assert payload['status'] == ":x: Access denied"
+        assert payload['level'] == "Unknown"
+    
+    def test_door_access_preserves_existing_fields(self):
+        """Test that door_access still includes text and attachments"""
+        result = slack_blocks.door_access(
+            name="Test User",
+            tag="1111111111",
+            status=":white_check_mark: Door unlocked",
+            level="Member"
+        )
+        
+        # Check that text field still exists
+        assert 'text' in result, "door_access should include text field"
+        assert result['text'] == "Someone interacted with the door"
+        
+        # Check that attachments field still exists
+        assert 'attachments' in result, "door_access should include attachments field"
+        assert len(result['attachments']) == 1
+        
+        # Check attachment structure
+        attachment = result['attachments'][0]
+        assert 'fields' in attachment
+        assert len(attachment['fields']) == 4
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
