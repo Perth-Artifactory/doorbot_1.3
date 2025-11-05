@@ -396,5 +396,62 @@ class TestSlackBlocksStructure:
                 assert "text" in element["text"]
 
 
+class TestSlackBlocksMetadata:
+    """Test suite for Slack blocks metadata functionality"""
+    
+    @pytest.mark.parametrize(
+        "name, tag, status, level",
+        [
+            ("John Doe", "1234567890", ":white_check_mark: Door unlocked", "Member"),
+            ("Jane Smith", "9876543210", ":white_check_mark: Door unlocked", "Admin"),
+            ("Unknown", "0000000000", ":x: Access denied", "Unknown"),
+        ]
+    )
+    def test_door_access_metadata(self, name, tag, status, level):
+        """Test that door_access includes correct metadata for various scenarios"""
+        result = slack_blocks.door_access(
+            name=name,
+            tag=tag,
+            status=status,
+            level=level
+        )
+        # Check that metadata field exists
+        assert 'metadata' in result, "door_access should include metadata field"
+        # Check metadata structure
+        metadata = result['metadata']
+        assert 'event_type' in metadata, "metadata should include event_type"
+        assert 'event_payload' in metadata, "metadata should include event_payload"
+        # Check event_type
+        assert metadata['event_type'] == 'door_access', "event_type should be 'door_access'"
+        # Check event_payload contains all the data
+        payload = metadata['event_payload']
+        assert payload['name'] == name, "payload should include name"
+        assert payload['tag'] == tag, "payload should include tag"
+        assert payload['status'] == status, "payload should include status"
+        assert payload['level'] == level, "payload should include level"
+    
+    def test_door_access_preserves_existing_fields(self):
+        """Test that door_access still includes text and attachments"""
+        result = slack_blocks.door_access(
+            name="Test User",
+            tag="1111111111",
+            status=":white_check_mark: Door unlocked",
+            level="Member"
+        )
+        
+        # Check that text field still exists
+        assert 'text' in result, "door_access should include text field"
+        assert result['text'] == "Someone interacted with the door"
+        
+        # Check that attachments field still exists
+        assert 'attachments' in result, "door_access should include attachments field"
+        assert len(result['attachments']) == 1
+        
+        # Check attachment structure
+        attachment = result['attachments'][0]
+        assert 'fields' in attachment
+        assert len(attachment['fields']) == 4
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

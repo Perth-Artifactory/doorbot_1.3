@@ -232,4 +232,13 @@ def door_access(name, tag, status, level):
     return {
         'text': "Someone interacted with the door",
         'attachments': attachments,
+        'metadata': {
+            'event_type': 'door_access',
+            'event_payload': {
+                'name': name,
+                'tag': tag,
+                'status': status,
+                'level': level
+            }
+        }
     }
