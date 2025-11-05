@@ -1,0 +1,51 @@
+name: Run Tests
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-cov
+          pip install -r requirements.txt
+      
+      - name: Prepare for tests
+        run: |
+          # Copy template config to actual config
+          cp config.json.template config.json
+          # Create dir used in config
+          mkdir -p data
+      
+      - name: Run tests with coverage
+        run: |
+          python -m pytest -v -m "not integration" --cov=doorbot --cov-report=html --cov-report=term
+          
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 30

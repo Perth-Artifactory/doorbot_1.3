@@ -1,7 +1,7 @@
 {
     "mock_raspberry_pi": false,
-    "SLACK_APP_TOKEN": "",
-    "SLACK_BOT_TOKEN": "",
+    "SLACK_APP_TOKEN": "xapp-test-token",
+    "SLACK_BOT_TOKEN": "xoxb-test-token",
     "slack_channel": "#doorbot-slack-test",
     "slack_channel_logs": "#doorbot-test-2",
     "admin_usergroup_handle": "doorbot-admins",
@@ -10,12 +10,12 @@
     "tidyauth": {
         "url": "http://enclave:5000",
         "token": "",
-        "cache_file": "/home/pi/doorbot_1.3/data/user_cache.json",
+        "cache_file": "data/user_cache.json",
         "update_interval_seconds": 60.0
     },
     "sounds_dir": "sounds",
-    "custom_sounds_dir": "/home/pi/doorbot_1.3/data/custom_sounds",
-    "log_path": "/home/pi/doorbot_1.3/data/doorbot.log",
+    "custom_sounds_dir": "data/custom_sounds",
+    "log_path": "data/doorbot.log",
     "access_granted_webhook": "http://ha:8123/api/webhook/xxx",
     "door_sensor_ha_api_url": "http://ha:8123/api/states/binary_sensor.front_door",
     "home_assistant_token": ""
