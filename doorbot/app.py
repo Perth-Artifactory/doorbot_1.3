@@ -351,7 +351,7 @@ async def check_user_authed(user_id):
 
             if config.admin_usergroup_id is None:
                 raise Exception(
-                    f"Could not find usergroup '{config.admin_usergroup_name}'")
+                    f"Could not find usergroup '{config.admin_usergroup_handle}'")
 
         # Get authorised users
         response = await app.client.usergroups_users_list(usergroup=config.admin_usergroup_id)
