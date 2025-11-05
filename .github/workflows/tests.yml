@@ -28,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install pytest pytest-asyncio
+          pip install pytest pytest-asyncio pytest-cov
           pip install -r requirements.txt
       
       - name: Prepare for tests
@@ -38,16 +38,14 @@ jobs:
           # Create dir used in config
           mkdir -p data
       
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
-          python -m pytest -v -m "not integration"
+          python -m pytest -v -m "not integration" --cov=doorbot --cov-report=html --cov-report=term
           
-      - name: Upload test results
+      - name: Upload coverage report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results
-          path: |
-            .pytest_cache/
-            htmlcov/
-          retention-days: 7
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 30
